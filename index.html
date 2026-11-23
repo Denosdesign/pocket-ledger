@@ -349,16 +349,69 @@ html,body{transition:background-color .24s ease,color .24s ease}
 @media(max-width:360px){.tabs nav{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 65px minmax(0,1fr) minmax(0,1fr)}.new-tab{width:56px;height:56px}.receipt-stack{padding:6px 12px 0}.receipt-stack .row{column-gap:7px}.receipt-stack .row .meta{font-size:10px}.custom-cat{grid-template-columns:minmax(0,.75fr) minmax(0,1.2fr) auto;gap:6px}}
 @media(prefers-reduced-motion:reduce){html,body,.new-tab,.theme-choice button,.palette-choice,.app.is-leaving,.app.is-entering{animation:none!important;transition:none!important}}
 
+
+/* Floating glass navigation and date utility header */
+.app{padding-top:calc(env(safe-area-inset-top) + 22px);padding-bottom:calc(env(safe-area-inset-bottom) + 142px)}
+.utility-header{display:flex;align-items:center;justify-content:space-between;min-height:45px;gap:15px}
+.utility-date{display:inline-flex;align-items:center;flex-wrap:wrap;gap:7px;min-width:0;color:var(--accent-ink);font-size:11px;line-height:1.3;font-weight:500;letter-spacing:.095em;text-transform:uppercase}
+.utility-dot{display:inline-block;flex:none;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.utility-divider{opacity:.6}
+.utility-settings{width:42px;height:42px;display:grid;place-items:center;flex:none;border-radius:15px;color:var(--ink);background:var(--soft);border:1px solid var(--line);text-decoration:none;transition:transform .18s,background-color .18s,border-color .18s}
+.utility-settings svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.85;stroke-linecap:round;stroke-linejoin:round}
+.utility-settings:active{transform:scale(.94)}
+.utility-settings:hover,.utility-settings[aria-current="page"]{background:var(--accent-soft);border-color:var(--accent-outline);color:var(--accent-ink)}
+.hero{margin-top:21px;padding-top:0}
+.hero-title{margin-top:0}
+h2{margin-top:24px}
+.overview-eyebrow{margin-top:24px}
+.overview-heading{margin-top:10px}
+.cycle-range{margin-top:9px;font-size:14px;color:var(--muted)}
+.cycle-preview{display:flex;flex-direction:column;gap:2px;margin-top:19px;padding:15px 16px;border-radius:16px;background:var(--accent-soft);border:1px solid var(--accent-outline)}
+.cycle-preview>span{font-size:12px;color:var(--accent-ink)}
+.cycle-preview>strong{font-size:17px;font-weight:500;color:var(--ink)}
+.cycle-select{font-variant-numeric:tabular-nums}
+/* Depth is conveyed through refraction, a highlight edge and translucency.
+   A near-opaque fallback is used if background blurring isn't supported. */
+.tabs{position:fixed;z-index:20;left:50%;right:auto;bottom:calc(env(safe-area-inset-bottom) + 14px);transform:translateX(-50%);
+  width:min(500px,calc(100% - 28px));height:76px;padding:5px 7px;border:1px solid rgba(255,255,255,.76);
+  border-radius:29px;background:rgba(251,249,246,.82);box-shadow:0 17px 44px rgba(40,32,23,.13),0 4px 14px rgba(46,39,29,.06),inset 0 1.5px rgba(255,255,255,.94),inset 0 -1px rgba(255,255,255,.26);
+  -webkit-backdrop-filter:blur(22px) saturate(1.7);backdrop-filter:blur(22px) saturate(1.7);isolation:isolate;}
+.tabs::before{content:"";position:absolute;inset:1px 9px auto;height:35%;border-radius:28px 28px 50% 50%;background:linear-gradient(180deg,rgba(255,255,255,.46),transparent);pointer-events:none;z-index:-1}
+.tabs nav{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 65px minmax(0,1fr) minmax(0,1fr);align-items:center;max-width:none;height:100%;min-height:0;gap:2px}
+.tabs a{display:flex;flex-direction:column;gap:3px;justify-content:center;align-items:center;position:relative;min-width:0;height:62px;min-height:0;padding:5px 0;border-radius:20px;color:var(--muted);font-size:10.5px;font-weight:500;letter-spacing:-.015em;line-height:1.25;
+  transition:color .24s ease,background-color .24s ease,transform .22s ease}
+.tabs a::before{display:none}
+.tabs a[aria-current="page"]{color:var(--accent-ink);background:var(--accent-soft);font-weight:500}
+.tabs a:hover{color:var(--accent-ink)}
+.tabs a:active{transform:scale(.94)}
+.tabs .nav-icon{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:none;transition:transform .26s cubic-bezier(.18,.8,.18,1)}
+.tabs a[aria-current="page"] .nav-icon{transform:translateY(-1px);stroke-width:2}
+.tabs .count{position:absolute;right:9px;top:4px;display:grid;place-items:center;min-width:16px;height:16px;padding:0 3px;border-radius:50%;background:var(--accent);color:var(--button-ink);font-size:10px;line-height:1;box-shadow:0 2px 8px var(--shadow)}
+.tabs .count[hidden]{display:none}
+.new-tab{width:59px;height:59px;border-radius:21px;transform:translateY(-8px);box-shadow:0 8px 20px rgba(193,91,30,.20),inset 0 1px rgba(255,255,255,.55);color:var(--button-ink)}
+.new-tab svg{width:29px;height:29px;fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round}
+.new-tab:hover{transform:translateY(-10px)}
+.new-tab:active{transform:translateY(-7px) scale(.94)}
+.toast{bottom:calc(env(safe-area-inset-bottom) + 106px)}
+:root[data-mode="dark"] .tabs{background:rgba(37,38,40,.79);border-color:rgba(255,255,255,.16);box-shadow:0 16px 48px rgba(0,0,0,.38),inset 0 1.5px rgba(255,255,255,.20)}
+:root[data-mode="dark"] .tabs::before{background:linear-gradient(180deg,rgba(255,255,255,.11),transparent)}
+@media(prefers-color-scheme:dark){:root[data-mode="system"] .tabs{background:rgba(37,38,40,.79);border-color:rgba(255,255,255,.16);box-shadow:0 16px 48px rgba(0,0,0,.38),inset 0 1.5px rgba(255,255,255,.20)}
+:root[data-mode="system"] .tabs::before{background:linear-gradient(180deg,rgba(255,255,255,.11),transparent)}}
+@supports not ((backdrop-filter:blur(10px)) or (-webkit-backdrop-filter:blur(10px))){.tabs{background:var(--surface)}}
+@media(prefers-reduced-transparency:reduce){.tabs{background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none}}
+@media(max-width:360px){.tabs{width:calc(100% - 20px);padding:5px}.tabs nav{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 59px minmax(0,1fr) minmax(0,1fr);gap:0}.tabs a{font-size:9.7px;letter-spacing:-.025em}.tabs .nav-icon{width:19px;height:19px}.new-tab{width:53px;height:53px;border-radius:18px}.utility-date{font-size:10px;letter-spacing:.06em}.utility-settings{width:40px;height:40px}}
+@media(prefers-reduced-motion:reduce){.utility-settings,.tabs .nav-icon,.tabs a,.new-tab{transition:none!important}}
+
 </style>
 </head>
 <body>
 <main class="app" id="main"></main>
-<div class="tabs"><nav aria-label="Sections">
-  <a href="#today" data-tab="today">Today</a>
-  <a href="#receipt" data-tab="receipt">Receipt</a>
-  <button type="button" class="new-tab" id="new-tab" aria-label="New expense" title="New expense"><span aria-hidden="true">+</span><span class="sr">New expense</span></button>
-  <a href="#review" data-tab="review">Review<span class="count" id="badge" hidden></span></a>
-  <a href="#overview" data-tab="overview">Overview</a>
+<div class="tabs"><nav aria-label="Main navigation">
+  <a href="#today" data-tab="today"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3.5 10.5 8.5-7 8.5 7v9A1.5 1.5 0 0 1 19 21H5a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M9.5 21v-7h5v7"/></svg><span>Today</span></a>
+  <a href="#receipt" data-tab="receipt"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18l-3.5-2-3.5 2-3.5-2L5 21z"/><path d="M8.5 8h7m-7 4h7m-7 4h4"/></svg><span>Receipt</span></a>
+  <button type="button" class="new-tab" id="new-tab" aria-label="New expense" title="New expense"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="sr">New expense</span></button>
+  <a href="#review" data-tab="review"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.7"/><path d="m8 12.2 2.6 2.6L16.6 9"/></svg><span>Review</span><span class="count" id="badge" hidden></span></a>
+  <a href="#overview" data-tab="overview"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 20.5v-8m5 8v-15m5 15v-11m5 11v-6M2.5 20.5h19"/></svg><span>Overview</span></a>
 </nav></div>
 <div id="sheet-root"></div>
 <div id="toast-root"></div>
@@ -463,7 +516,7 @@ function isoWeek(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.get
 const framed=(()=>{try{return window.self!==window.top}catch{return true}})();
 
 function defaults(){return{entries:[],dict:{},card:[],recon:{last:null,log:[]},ai:{requests:0,cost:0,lastError:""},
-  customCategories:[],aiResults:{},settings:{budget:600000,currency:"HK$",ai:false,key:"",model:"",deny:true,preferLocal:true,suggestNew:true,palette:"apricot",theme:"light"},seeded:false}}
+  customCategories:[],aiResults:{},settings:{budget:600000,currency:"HK$",ai:false,key:"",model:"",deny:true,preferLocal:true,suggestNew:true,palette:"apricot",theme:"light",cycleStart:1},seeded:false}}
 let S=defaults(),storageOK=true;
 function load(){
   try{const raw=localStorage.getItem(STORE_KEY);if(raw){const p=JSON.parse(raw);const d=defaults();S={...d,...p,settings:{...d.settings,...p.settings},recon:{...d.recon,...p.recon},ai:{...d.ai,...p.ai}}}}
@@ -471,6 +524,7 @@ function load(){
   S.settings.currency=safeCurrency(S.settings.currency);
   S.settings.palette=COLOURWAYS[S.settings.palette]?S.settings.palette:"apricot";
   S.settings.theme=THEME_MODES.includes(S.settings.theme)?S.settings.theme:"light";
+  S.settings.cycleStart=validCycleStart(S.settings.cycleStart)?S.settings.cycleStart:1;
   S.customCategories=Array.isArray(S.customCategories)?S.customCategories.filter(x=>typeof x==="string"&&x.length<=28&&!BASE_CATEGORIES.some(c=>norm(c)===norm(x))).slice(0,32):[];
   if(!S.aiResults||typeof S.aiResults!=="object"||Array.isArray(S.aiResults))S.aiResults={};
   applyAppearance();
@@ -485,6 +539,7 @@ function parseMoney(str,allowNeg=false,allowZero=false){const s=String(str??"").
   if(!/^-?(\d+\.?\d{0,2}|\.\d{1,2})$/.test(s))return null;const n=Math.round(parseFloat(s)*100);
   if(!Number.isSafeInteger(n)||(!allowZero&&n===0)||(!allowNeg&&n<0))return null;return n}
 const safeCurrency=s=>String(s||"HK$").replace(/[<>&"'`]/g,"").trim().slice(0,5)||"HK$";
+const validCycleStart=n=>Number.isInteger(n)&&n>=1&&n<=31;
 const validDate=s=>typeof s==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&ymd(toDate(s))===s;
 
 const find=id=>S.entries.find(e=>e.id===id);
@@ -498,8 +553,29 @@ const isProvisional=(d,verified=verifiedReconciliations())=>!verified.some(r=>r.
 const needsReview=e=>e.type==="purchase"&&["none","review","proposal"].includes(e.status);
 const needsAttention=e=>needsReview(e)||(e.type==="purchase"&&e.status==="ai");
 const aiReady=()=>S.settings.ai&&S.settings.key&&S.settings.model;
-function monthStats(ref=today()){const d=toDate(ref);const first=ymd(new Date(d.getFullYear(),d.getMonth(),1));const lastD=new Date(d.getFullYear(),d.getMonth()+1,0);const last=ymd(lastD);
-  const spent=spendIn(first,last),budget=S.settings.budget||0;return{first,last,spent,budget,left:budget-spent,daysLeft:lastD.getDate()-d.getDate()+1,name:MONTHS_LONG[d.getMonth()]}}
+/* Financial month boundaries are anchored to calendar months. 29–31 use the
+   last available day in a shorter month (including leap years). */
+function cycleAnchor(year,monthIndex,startDay){
+  const lastDay=new Date(year,monthIndex+1,0).getDate();
+  return ymd(new Date(year,monthIndex,Math.min(startDay,lastDay)))}
+function cycleBounds(ref=today(),day=S.settings.cycleStart){
+  const d=toDate(ref),n=validCycleStart(day)?day:1;
+  let y=d.getFullYear(),m=d.getMonth(),first=cycleAnchor(y,m,n);
+  if(ref<first){m--;if(m<0){y--;m=11}first=cycleAnchor(y,m,n)}
+  let nextM=m+1,nextY=y;if(nextM>11){nextM=0;nextY++}
+  const next=cycleAnchor(nextY,nextM,n);
+  return{first,last:addDays(next,-1),next}}
+function cycleLabel(first,last){
+  const a=toDate(first),b=toDate(last),crossYear=a.getFullYear()!==b.getFullYear();
+  return `${shortDate(first)}${crossYear?` ${a.getFullYear()}`:""} – ${shortDate(last)}${crossYear?` ${b.getFullYear()}`:""}`}
+function monthStats(ref=today()){
+  const {first,last,next}=cycleBounds(ref);
+  const spent=spendIn(first,last),budget=S.settings.budget||0;
+  const utc=s=>{const [y,m,d]=s.split("-").map(Number);return Date.UTC(y,m-1,d)};
+  const daysLeft=Math.round((utc(last)-utc(ref))/864e5)+1;
+  return{first,last,next,spent,budget,left:budget-spent,daysLeft,
+    name:cycleLabel(first,last),calendarName:MONTHS_LONG[toDate(first).getMonth()]}}
+
 
 /* Taxonomy is owned by the person, not the AI. Similarity checks run locally. */
 const CATEGORY_HINTS={
@@ -627,7 +703,10 @@ const cur=()=>esc(S.settings.currency);
 function fig(c,cls=""){const a=Math.abs(c),whole=Math.floor(a/100).toLocaleString("en-US"),cents=a%100;
   const scale=whole.length>=8?"longer":whole.length>=6?"long":"";
   return `<div class="fig ${cls} ${scale}" aria-label="${esc(money(c))}"><small>${cur()}</small>${c<0?"−":""}${whole}${cents?`<small style="margin-left:4px">.${pad(cents)}</small>`:""}</div>`}
-const masthead=()=>`<header class="top"><b><span class="brand-mark" aria-hidden="true"></span>Pocket Ledger</b><a href="#prefs"${view==="prefs"?' aria-current="page"':''}>Settings</a></header>`;
+const masthead=()=>`<header class="utility-header">
+  <span class="utility-date"><span class="utility-dot" aria-hidden="true"></span>${esc(WD_LONG[toDate(today()).getDay()])} <span class="utility-divider">·</span> ${esc(shortDate(today()))}</span>
+  <a class="utility-settings" href="#prefs" aria-label="Settings" title="Settings"${view==="prefs"?' aria-current="page"':''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7h3m5 0h9M3.5 17h9m5 0h3"/><circle cx="9" cy="7" r="2.5"/><circle cx="15" cy="17" r="2.5"/></svg></a>
+</header>`;
 const hasExamples=()=>S.entries.some(e=>e.example)||S.card.some(c=>c.example);
 function foot(){const p=[];
   if(!storageOK)p.push(`<span style="color:var(--warn)">This browser isn't saving. Copy a backup in Settings before closing.</span>`);
@@ -646,10 +725,9 @@ function recentLabels(){const since=addDays(today(),-60),m=new Map();
 function viewToday(){const t=today(),tot=spendIn(t,t),m=monthStats(),todays=S.entries.filter(e=>e.date===t).sort(byNewest),rec=recentLabels();
   return `${masthead()}
   <section class="hero" aria-label="Today’s spending">
-    <div class="eyebrow">${esc(WD_LONG[toDate(t).getDay()])} · ${esc(shortDate(t))}</div>
     <h1 class="hero-title">Today’s spending</h1>
     ${fig(tot)}
-    <div class="hero-footer"><span class="budget-remain">${m.left>=0?`${money(m.left)} remaining`:`${money(-m.left)} over budget`}</span><span class="budget-context">${m.name} budget</span></div>
+    <div class="hero-footer"><span class="budget-remain">${m.left>=0?`${money(m.left)} remaining`:`${money(-m.left)} over budget`}</span><span class="budget-context" title="${esc(m.name)}">${esc(m.name)}</span></div>
     <div class="meter${m.left<0?" over":""}"><i style="width:${m.budget?Math.min(100,m.spent/m.budget*100):0}%"></i></div>
   </section>
   <section class="history today-history" aria-label="Today’s entries">
@@ -668,7 +746,7 @@ function viewReceipt(){const t=today();
   const days=new Map();for(const e of list){if(!days.has(e.date))days.set(e.date,[]);days.get(e.date).push(e)}
   const f=(k,l)=>`<button class="link" data-act="filter" data-f="${k}" aria-pressed="${receiptFilter===k}">${l}</button>`;
   return `${masthead()}
-  <h2>Receipt</h2><p class="sub">${money(spendIn(addDays(t,-29),t))} in the last 30 days</p>
+  <h2>Receipt</h2><p class="sub">${money(spendIn(monthStats().first,monthStats().last))} this financial month · ${esc(monthStats().name)}</p>
   <div class="filters">${f("all","All")}${f("review",`To review${nRev?" "+nRev:""}`)}${f("other","Other types")}
     <button class="link ink push" data-act="new" data-preset="past">Add past entry</button></div>
   ${days.size?[...days].map(([d,es])=>{const dd=toDate(d),tot=es.reduce((a,e)=>SPEND.has(e.type)?a+e.amount:a,0);
@@ -735,15 +813,16 @@ function viewOverview(){const t=today(),m=monthStats(),pct=m.budget?Math.min(100
     <div class="line"><span>Logged spending since</span><span class="v">${money(buy)}</span></div>
     <div class="line"><span>Illustrative balance<small>Assumes all logged purchases used this card</small></span><span class="v">${money(latest.bal+buy-rep)}</span></div></div>`}
   return `${masthead()}
-  <div class="eyebrow" style="margin-top:43px">MONTHLY OVERVIEW</div>
-  <h2 style="margin-top:10px">${m.name}</h2>
+  <div class="eyebrow overview-eyebrow">FINANCIAL MONTH</div>
+  <h2 class="overview-heading">${m.calendarName}</h2>
+  <p class="sub cycle-range">${esc(m.name)}</p>
   ${fig(m.spent)}
   <p class="sub">of ${money(m.budget)} · ${m.left>=0?`${money(m.left)} left, about ${money(Math.floor(m.left/m.daysLeft))} a day`:`${money(-m.left)} over`}</p>
   <div class="meter${m.left<0?" over":""}"><i style="width:${pct}%"></i></div>
-  <p class="note">${!ms.some(e=>SPEND.has(e.type))?"No spending recorded this month.":unverified.length?`${money(prov)} across ${unverified.length} unreconciled ${unverified.length===1?"entry":"entries"}.`:"All recorded spending reconciled."}</p>
+  <p class="note">${!ms.some(e=>SPEND.has(e.type))?"No spending recorded this financial month.":unverified.length?`${money(prov)} across ${unverified.length} unreconciled ${unverified.length===1?"entry":"entries"}.`:"All recorded spending reconciled."}</p>
   <section class="sec"><h3><span>By category</span></h3>
     ${cats.length||flags.length?cats.map(c=>cat(c,false)).join("")+flags.map(f=>cat(f,true)).join("")
-    +(flags.length?`<p class="note">Grey rows count toward the total but stay out of categories.</p>`:""):`<p class="empty">No spending this month.</p>`}
+    +(flags.length?`<p class="note">Grey rows count toward the total but stay out of categories.</p>`:""):`<p class="empty">No spending this financial month.</p>`}
   </section>
   <section class="sec"><h3><span>Credit card</span></h3>
     ${card}
@@ -768,9 +847,17 @@ function viewPrefs(){const s=S.settings;
     <div class="palette-grid" role="group" aria-label="Accent colour">${Object.entries(COLOURWAYS).map(([id,p])=>`<button type="button" class="palette-choice" data-act="palette" data-v="${id}" aria-pressed="${s.palette===id}"><span class="palette-dot" style="background:${p.colour}"></span><span>${p.name}</span>${s.palette===id?`<span class="palette-tick" aria-hidden="true">✓</span>`:""}</button>`).join("")}</div>
     <div class="theme-choice" role="group" aria-label="Display theme">${THEME_MODES.map(m=>`<button type="button" data-act="theme" data-v="${m}" aria-pressed="${s.theme===m}">${m[0].toUpperCase()+m.slice(1)}</button>`).join("")}</div>
   </section>
+  <section class="sec"><h3><span>Financial month</span></h3>
+    <p class="note">Set the date your monthly budget resets. It also sets the reporting period for Overview and Receipt.</p>
+    <label class="fld"><span>Start a new financial month on</span><select class="in sm cycle-select" id="p-cycle" data-cycle="1" aria-label="Financial month start day">
+      ${Array.from({length:31},(_,i)=>i+1).map(day=>`<option value="${day}" ${s.cycleStart===day?"selected":""}>${day}${day===31?" · end of month":""}</option>`).join("")}
+    </select></label>
+    <div class="cycle-preview" aria-live="polite"><span>Current financial month</span><strong>${esc(monthStats().name)}</strong></div>
+    <p class="note">For months with fewer days, the period starts on the last available day. For example, choosing 31 means the final day of every month.</p>
+  </section>
   <section class="sec"><h3><span>Budget</span></h3>
     <div class="two">
-      <label class="fld amt"><span>Monthly</span><input class="in sm" id="p-budget" data-num="budget" value="${plain(s.budget)}" inputmode="decimal"><span class="sm" aria-hidden="true">${cur()}</span></label>
+      <label class="fld amt"><span>Per financial month</span><input class="in sm" id="p-budget" data-num="budget" value="${plain(s.budget)}" inputmode="decimal"><span class="sm" aria-hidden="true">${cur()}</span></label>
       <label class="fld"><span>Currency</span><input class="in sm" id="p-cur" data-set="currency" value="${esc(s.currency)}" maxlength="5"></label>
     </div>
   </section>
@@ -942,7 +1029,8 @@ function importData(text){let p;try{p=JSON.parse(text)}catch{toast("That file is
     settings:{...d.settings,budget:Number.isSafeInteger(opts.budget)&&opts.budget>=0?opts.budget:d.settings.budget,
       currency:safeCurrency(opts.currency),ai:opts.ai===true,model:typeof opts.model==="string"?opts.model.slice(0,150):"",
       deny:opts.deny!==false,preferLocal:opts.preferLocal!==false,suggestNew:opts.suggestNew!==false,
-      palette:COLOURWAYS[opts.palette]?opts.palette:"apricot",theme:THEME_MODES.includes(opts.theme)?opts.theme:"light",key},seeded:true};
+      palette:COLOURWAYS[opts.palette]?opts.palette:"apricot",theme:THEME_MODES.includes(opts.theme)?opts.theme:"light",
+      cycleStart:validCycleStart(opts.cycleStart)?opts.cycleStart:1,key},seeded:true};
   applyAppearance();persist();render();toast(`Imported ${S.entries.length} entries.`,()=>{S=JSON.parse(prev);persist();render()})}
 
 /* Actions */
@@ -1019,6 +1107,7 @@ $("main").addEventListener("change",e=>{const t=e.target,d=t.dataset;
   if(d.draft==="date"){draft.date=t.value||today();render()}
   else if(d.rec&&t.type==="date"){recDraft[d.rec]=t.value||today();render()}
   else if(d.card==="date")cardDraft.date=t.value||today();
+  else if(d.cycle){const n=Number(t.value);if(validCycleStart(n)){S.settings.cycleStart=n;persist()}render();toast(`Financial month now starts on day ${S.settings.cycleStart}.`)}
   else if(d.num){const v=parseMoney(t.value);if(v!=null){S.settings[d.num]=v;persist()}render()}
   else if(d.set&&t.type==="checkbox"){S.settings[d.set]=t.checked;persist();
     if(d.set==="ai"&&t.checked&&!(S.settings.key&&S.settings.model))toast("Add a key and a model to get suggestions.");render()}
