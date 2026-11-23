@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-title" content="Ledger">
 <meta name="theme-color" content="#FFFFFF">
 <title>Pocket Ledger</title>
-<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAAB7klEQVR42u3dS66CMBSA4YNxBex/jWyhDpyY+OqgD3r4vuENwRv8LRVp2EopAZ/cHALEgTgQB+JAHIgDcSAOxIE4QByIA3EgDsSBOBAH4kAciAPEgTgQB+JAHIgDcSAOxIE4QByIA3EgDka4r/KP7vue6bgfx2HkwGkFcSAOEAfiQByIA3EgDsSBOBAH4kAcIA7EgTgQB+Ee0khzY2aa212NHIgDcWDOcYm1LUYOxIE4EAfiQBwgDsSBOAhXSONMv8pe6iKskQNxIA7MOUwIjByIA3EgDsSBOBAHiANxEK6QxknWyqa8OGvkQByIA3MOv8oaORAH4kAciANxIA4QB+JAHIgDcSAOxIE4EAfiAHEgDsSBOBAH4iCsW4mLrbn1XFmcVhAHiAMT0rAg28iBOBAH4kAciANxIA4QB+JAHIgDcSAOxIE4EAfiAHGQII7KhUb165Fm7TCmPqgw7cjx95g+N6g59JVbNt/hQmWkOq28HvTfb0D9ls13uFAZ68Xx7eC+/735lj1eWhxLPll4uTdSHIM+0yPHJ3FM+4g3nw10ndmIo2UTPb5HTPkKc05bKcXJFVdIEQfiQByIA3EgDsSBOBAHiANxIA7EgTgQB+JAHIgDcYA4EAfiQByIA3EgDsSBOBAH4gBxIA7EQXcPsXfJy4ec0ssAAAAASUVORK5CYII=">
-<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAAB7klEQVR42u3dS66CMBSA4YNxBex/jWyhDpyY+OqgD3r4vuENwRv8LRVp2EopAZ/cHALEgTgQB+JAHIgDcSAOxIE4QByIA3EgDsSBOBAH4kAciAPEgTgQB+JAHIgDcSAOxIE4QByIA3EgDka4r/KP7vue6bgfx2HkwGkFcSAOEAfiQByIA3EgDsSBOBAH4kAcIA7EgTgQB+Ee0khzY2aa212NHIgDcWDOcYm1LUYOxIE4EAfiQBwgDsSBOAhXSONMv8pe6iKskQNxIA7MOUwIjByIA3EgDsSBOBAHiANxEK6QxknWyqa8OGvkQByIA3MOv8oaORAH4kAciANxIA4QB+JAHIgDcSAOxIE4EAfiAHEgDsSBOBAH4iCsW4mLrbn1XFmcVhAHiAMT0rAg28iBOBAH4kAciANxIA4QB+JAHIgDcSAOxIE4EAfiAHGQII7KhUb165Fm7TCmPqgw7cjx95g+N6g59JVbNt/hQmWkOq28HvTfb0D9ls13uFAZ68Xx7eC+/735lj1eWhxLPll4uTdSHIM+0yPHJ3FM+4g3nw10ndmIo2UTPb5HTPkKc05bKcXJFVdIEQfiQByIA3EgDsSBOBAHiANxIA7EgTgQB+JAHIgDcYA4EAfiQByIA3EgDsSBOBAH4gBxIA7EQXcPsXfJy4ec0ssAAAAASUVORK5CYII=">
+<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+<link rel="icon" type="image/png" href="./icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist:wght@400;500&display=swap" rel="stylesheet">
@@ -154,6 +154,112 @@ body.dialog-open{overflow:hidden}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (max-width:360px){.fig{font-size:84px}}
 </style>
+<style>
+/* Pocket Ledger visual system */
+:root{
+  --accent:#3155DC;
+  --accent-dark:#2441BC;
+  --accent-soft:#EEF2FF;
+  --accent-outline:#D8E1FF;
+  --ink:#17191E;
+  --muted:#747982;
+  --line:#E8E9EC;
+  --soft:#F6F7F9;
+  --bg:#FFFFFF;
+}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.app{padding-top:calc(env(safe-area-inset-top) + 24px)}
+.top{align-items:center;min-height:30px;font-size:13px}
+.top b{display:inline-flex;align-items:center;gap:9px;font-size:14px;font-weight:500;letter-spacing:-.025em}
+.top a{transition:color .2s}
+.top a:hover,.top a[aria-current="page"]{color:var(--accent)}
+.brand-mark{display:inline-grid;place-items:center;flex:none;width:28px;height:28px;border-radius:8px;background:var(--accent)}
+.brand-mark::after{content:"";display:block;width:12px;height:12px;border-top:2px solid white;border-bottom:2px solid white;background:linear-gradient(white,white) center/12px 2px no-repeat;transform:rotate(-8deg)}
+h2{margin-top:42px;font-size:clamp(40px,10vw,48px)}
+.sub{color:var(--muted)}
+.eyebrow{display:flex;align-items:center;gap:7px;color:var(--accent);font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase}
+.eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.hero{margin-top:48px}
+.hero-title{font:400 clamp(38px,10vw,48px)/1.05 var(--display);letter-spacing:-.02em;margin:16px 0 0}
+.hero .fig{font-size:clamp(78px,22vw,108px);margin-top:16px}
+.hero .fig.long{font-size:clamp(56px,17vw,84px)}
+.hero .fig.longer{font-size:clamp(39px,12vw,64px)}
+.hero .fig small{color:var(--muted)}
+.hero .fig small:first-child{color:var(--accent);font-weight:500}
+.hero-footer{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-top:19px}
+.hero-footer .budget-remain{font-size:14px;color:var(--ink);font-weight:500}
+.hero-footer .budget-context{font-size:12px;color:var(--muted);white-space:nowrap}
+.meter{overflow:hidden;height:5px;border-radius:20px;background:var(--soft);margin-top:13px}
+.meter i{display:block;height:100%;border-radius:20px;background:var(--accent);transform-origin:left;animation:fillAcross .55s cubic-bezier(.16,1,.3,1) both}
+.meter.over i{background:var(--warn)}
+.capture-card{margin-top:43px;padding:23px 21px 20px;border:1px solid var(--line);border-radius:22px;background:#fff;box-shadow:0 7px 35px rgba(15,20,45,.035)}
+.section-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.section-head h3{font-size:17px;font-weight:500;letter-spacing:-.035em;line-height:1.3;margin:0}
+.section-head span{font-size:12px;color:var(--muted)}
+.capture-card .cap{margin-top:14px;column-gap:14px}
+.capture-card .in{font-size:19px}
+.capture-card .amt .in{font-size:19px}
+.capture-card .acts{margin-top:20px;gap:4px 14px}
+.capture-card .link{font-size:13px}
+.capture-card .recent button{border-radius:7px;color:var(--accent);transition:color .16s,background-color .16s}
+.capture-card .recent button:hover{background:var(--accent-soft)}
+.history{margin-top:37px}
+.history .list{margin-top:11px}
+.btn{height:43px;background:var(--accent);box-shadow:0 3px 10px rgba(49,85,220,.12);transition:transform .18s ease,background-color .18s ease,box-shadow .18s ease}
+.btn:hover:not(:disabled){background:var(--accent-dark);box-shadow:0 5px 16px rgba(49,85,220,.23)}
+.btn:active:not(:disabled){transform:scale(.965)}
+.btn:disabled{background:#B4B8C3;color:white;box-shadow:none;opacity:1}
+.link{transition:color .16s ease,opacity .16s ease}
+.link.ink,.link[aria-pressed="true"]{color:var(--accent)}
+.link:active,.row:active,.opts button:active,.models button:active{opacity:.65}
+.in{transition:border-color .16s ease}
+.in:focus{border-bottom-color:var(--accent)}
+.in::placeholder{color:#A9ADB8}
+.row{border-radius:8px;transition:background-color .18s ease,padding .18s ease}
+.row:hover{background:var(--soft);padding-left:8px;padding-right:8px}
+.row:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.list .empty{padding:23px 0}
+.sec{margin-top:42px;padding-top:23px;border-top:1px solid var(--line)}
+.sec>h3{font-size:17px;letter-spacing:-.025em;font-weight:500;color:var(--ink);align-items:baseline;margin-bottom:10px}
+.sec>h3>span+span{font-size:12px;font-weight:400;letter-spacing:0;color:var(--muted)}
+.sec>h3 .link{font-size:13px}
+.cat .bar{height:4px;background:var(--soft);border-radius:4px;overflow:hidden}
+.cat .bar i{border-radius:4px;background:var(--accent);transform-origin:left;animation:fillAcross .48s ease-out both}
+.opts button{transition:background-color .15s,color .15s,transform .15s}
+.opts button[aria-pressed="true"]{background:var(--accent);color:white}
+.opts button:hover:not([aria-pressed="true"]){background:var(--accent-soft);color:var(--accent)}
+.sw input:checked+span{background:var(--accent)}
+.tabs{border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(16,20,34,.025)}
+.tabs a{position:relative;font-size:13px;transition:color .22s ease}
+.tabs a::before{content:"";position:absolute;top:0;left:calc(50% - 16px);width:32px;height:3px;border-radius:0 0 5px 5px;background:var(--accent);transform:scaleX(0);transition:transform .24s cubic-bezier(.16,1,.3,1)}
+.tabs a[aria-current="page"]{color:var(--accent);font-weight:500}
+.tabs a[aria-current="page"]::before{transform:scaleX(1)}
+.tabs .count{color:var(--accent)}
+.sheet{box-shadow:0 -16px 55px rgba(18,26,50,.10)}
+.types button{transition:color .2s,border-color .2s}
+.types button[aria-pressed="true"]{border-bottom-color:var(--accent);color:var(--accent)}
+.toast{background:#20294C;animation:toastIn .24s cubic-bezier(.16,1,.3,1) both}
+.app.is-entering{animation:pageIn .26s cubic-bezier(.16,1,.3,1) both}
+.install-card{display:grid;grid-template-columns:30px minmax(0,1fr);gap:13px;margin-top:30px;padding:17px 17px 16px;border:1px solid var(--accent-outline);border-radius:17px;background:var(--accent-soft)}
+.install-symbol{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--accent);color:white;font-size:21px;font-weight:400;line-height:1}
+.install-card strong{display:block;font-size:14px;font-weight:500;color:var(--ink)}
+.install-card p{margin:3px 0 8px;font-size:12px;line-height:1.5;color:#626C8A}
+.install-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.install-actions button{padding:5px 0;border:0;background:none;font-size:13px;color:var(--accent);font-weight:500}
+.install-actions button:last-child:not(:first-child){color:var(--muted);font-weight:400}
+.install-steps{margin:18px 0;padding:0 0 0 27px}
+.install-steps li{padding:0 0 15px 5px;font-size:15px}
+.install-steps li::marker{color:var(--accent);font-weight:500}
+.install-steps small{display:block;color:var(--muted);font-size:13px;margin-top:3px}
+.install-icon{display:inline-flex;vertical-align:-4px;width:18px;height:20px;color:var(--accent)}
+.install-sheet .note{margin:5px 0 0}
+@keyframes fillAcross{from{transform:scaleX(.04);opacity:.65}to{transform:scaleX(1);opacity:1}}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,12px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes pageIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:360px){.capture-card{padding:19px 15px 17px}.hero .fig{font-size:clamp(68px,20vw,88px)}.hero .fig.long{font-size:clamp(51px,16vw,72px)}.hero .fig.longer{font-size:clamp(35px,11vw,52px)}.hero-footer{flex-wrap:wrap;gap:4px}}
+@media(prefers-reduced-motion:reduce){.app.is-entering,.meter i,.cat .bar i,.toast{animation:none!important} .btn,.tabs a,.tabs a::before,.row,.link,.opts button,.in{transition:none!important}}
+
+</style>
 </head>
 <body>
 <main class="app" id="main"></main>
@@ -165,6 +271,65 @@ body.dialog-open{overflow:hidden}
 </nav></div>
 <div id="sheet-root"></div>
 <div id="toast-root"></div>
+<div id="install-root"></div>
+<script>
+/* iPhone Home Screen instructions. Web browsers cannot install an iOS PWA on the user's behalf. */
+(function(){
+  'use strict';
+  const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent)||navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1;
+  const standalone=()=>navigator.standalone===true||Boolean(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
+  const dismissed=()=>{try{return localStorage.getItem('pocket-ledger-install-dismissed')==='1'}catch{return false}};
+  const shareIcon='<svg class="install-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Share icon"><path d="M12 15V3m0 0 4 4m-4-4L8 7"/><path d="M5 12v8h14v-8"/></svg>';
+  let returnFocus=null;
+
+  window.homeGuideHTML=function(inSettings=false){
+    if(!ios||standalone()||(!inSettings&&dismissed()))return '';
+    return `<aside class="install-card" aria-label="Add Pocket Ledger to Home Screen"><span class="install-symbol" aria-hidden="true">+</span><div>
+       <strong>Keep Ledger on your Home Screen</strong><p>Open it like an app, straight from your iPhone.</p>
+       <div class="install-actions"><button type="button" data-install="show">How to add</button>${inSettings?'':`<button type="button" data-install="dismiss">Not now</button>`}</div>
+       </div></aside>`;
+  };
+
+  function close(){const host=document.getElementById('install-root');if(!host||!host.firstElementChild)return;
+    host.replaceChildren();document.body.classList.remove('dialog-open');
+    if(returnFocus&&returnFocus.isConnected)returnFocus.focus({preventScroll:true});returnFocus=null;}
+  function show(){if(!ios||standalone())return;returnFocus=document.activeElement;
+    const safari=/Safari/i.test(navigator.userAgent)&&!/CriOS|FxiOS|EdgiOS|OPiOS/i.test(navigator.userAgent);
+    const host=document.getElementById('install-root');if(!host)return;
+    host.innerHTML=`<div class="scrim" data-install="backdrop"><section class="sheet install-sheet" role="dialog" aria-modal="true" aria-labelledby="install-title">
+      <div class="eyebrow">POCKET LEDGER</div><h3 id="install-title" style="margin-top:12px">Add to Home Screen</h3>
+      ${!safari?'<p class="note">Open this website in Safari first, then follow these steps.</p>':''}
+      <ol class="install-steps"><li>Open Pocket Ledger in <strong>Safari</strong>.</li>
+      <li>Tap ${shareIcon} <strong>Share</strong> in the Safari toolbar.<small>If Share is not visible, open the page menu first.</small></li>
+      <li>Choose <strong>Add to Home Screen</strong>.<small>You may need to scroll through the list of actions.</small></li>
+      <li>Tap <strong>Add</strong> to confirm.</li></ol>
+      <p class="note">Ledger will open without the Safari toolbar. Your existing entries remain stored in Safari on this device. Use Settings to back them up.</p>
+      <div class="acts" style="margin-top:23px"><button type="button" class="btn push" data-install="close">Got it</button></div>
+      </section></div>`;
+    document.body.classList.add('dialog-open');host.querySelector('[data-install="close"]')?.focus({preventScroll:true});}
+
+  document.addEventListener('click',event=>{
+    const el=event.target.closest('[data-install]');if(!el)return;
+    const type=el.dataset.install;
+    if(type==='backdrop'&&event.target!==el)return;
+    event.preventDefault();
+    if(type==='show')show();
+    else if(type==='dismiss'){try{localStorage.setItem('pocket-ledger-install-dismissed','1')}catch{};if(typeof render==='function')render();}
+    else close();
+  });
+  document.addEventListener('keydown',event=>{
+    const host=document.getElementById('install-root');if(!host?.firstElementChild)return;
+    if(event.key==='Escape'){event.preventDefault();close();return}
+    if(event.key==='Tab'){
+      const controls=[...host.querySelectorAll('button:not([disabled])')];if(!controls.length)return;
+      const first=controls[0],last=controls.at(-1);
+      if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}
+      if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}
+    }
+  });
+})();
+
+</script>
 <script>
 
 "use strict";
@@ -306,7 +471,7 @@ const cur=()=>esc(S.settings.currency);
 function fig(c,cls=""){const a=Math.abs(c),whole=Math.floor(a/100).toLocaleString("en-US"),cents=a%100;
   const scale=whole.length>=8?"longer":whole.length>=6?"long":"";
   return `<div class="fig ${cls} ${scale}" aria-label="${esc(money(c))}"><small>${cur()}</small>${c<0?"−":""}${whole}${cents?`<small style="margin-left:4px">.${pad(cents)}</small>`:""}</div>`}
-const masthead=()=>`<header class="top"><b>Pocket Ledger</b><a href="#prefs">Settings</a></header>`;
+const masthead=()=>`<header class="top"><b><span class="brand-mark" aria-hidden="true"></span>Pocket Ledger</b><a href="#prefs">Settings</a></header>`;
 const hasExamples=()=>S.entries.some(e=>e.example)||S.card.some(c=>c.example);
 function foot(){const p=[];
   if(!storageOK)p.push(`<span style="color:var(--warn)">This browser isn't saving. Copy a backup in Settings before closing.</span>`);
@@ -324,9 +489,15 @@ function recentLabels(){const since=addDays(today(),-60),m=new Map();
 
 function viewToday(){const t=today(),tot=spendIn(t,t),m=monthStats(),todays=S.entries.filter(e=>e.date===t).sort(byNewest),rec=recentLabels();
   return `${masthead()}
-  <p class="sub" style="margin-top:56px">Today</p>
-  ${fig(tot)}
-  <p class="sub">${m.left>=0?`${money(m.left)} left in ${m.name}`:`${money(-m.left)} over budget in ${m.name}`}</p>
+  <section class="hero" aria-label="Today’s spending">
+    <div class="eyebrow">${esc(WD_LONG[toDate(t).getDay()])} · ${esc(shortDate(t))}</div>
+    <h1 class="hero-title">Today’s spending</h1>
+    ${fig(tot)}
+    <div class="hero-footer"><span class="budget-remain">${m.left>=0?`${money(m.left)} remaining`:`${money(-m.left)} over budget`}</span><span class="budget-context">${m.name} budget</span></div>
+    <div class="meter${m.left<0?" over":""}"><i style="width:${m.budget?Math.min(100,m.spent/m.budget*100):0}%"></i></div>
+  </section>
+  <section class="capture-card" aria-label="New expense">
+    <div class="section-head"><h3>New expense</h3><span>Quick entry</span></div>
   <form id="cap" autocomplete="off" novalidate>
     <div class="cap">
       <label><span class="sr">What was it</span><input class="in" id="cap-name" data-draft="name" value="${esc(draft.unknown?"":draft.name)}" placeholder="${draft.unknown?"Name forgotten":"What was it"}" ${draft.unknown?"disabled":""} enterkeyhint="next" autocapitalize="words" maxlength="40"></label>
@@ -340,7 +511,10 @@ function viewToday(){const t=today(),tot=spendIn(t,t),m=monthStats(),todays=S.en
     </div>
     <p class="err" role="status">${esc(capErr)}</p>
   </form>
-  <div class="list">${todays.length?todays.map(rowHTML).join(""):`<p class="empty">Nothing recorded today.</p>`}</div>
+  </section>
+  <section class="history"><div class="section-head"><h3>Today’s entries</h3><span>${todays.length} ${todays.length===1?"entry":"entries"}</span></div>
+  <div class="list">${todays.length?todays.map(rowHTML).join(""):`<p class="empty">Nothing recorded today.</p>`}</div></section>
+  ${typeof homeGuideHTML==="function"?homeGuideHTML():""}
   ${foot()}`}
 
 function viewReceipt(){const t=today();
@@ -416,7 +590,8 @@ function viewOverview(){const t=today(),m=monthStats(),pct=m.budget?Math.min(100
     <div class="line"><span>Logged spending since</span><span class="v">${money(buy)}</span></div>
     <div class="line"><span>Illustrative balance<small>Assumes all logged purchases used this card</small></span><span class="v">${money(latest.bal+buy-rep)}</span></div></div>`}
   return `${masthead()}
-  <h2>${m.name}</h2>
+  <div class="eyebrow" style="margin-top:43px">MONTHLY OVERVIEW</div>
+  <h2 style="margin-top:10px">${m.name}</h2>
   ${fig(m.spent)}
   <p class="sub">of ${money(m.budget)} · ${m.left>=0?`${money(m.left)} left, about ${money(Math.floor(m.left/m.daysLeft))} a day`:`${money(-m.left)} over`}</p>
   <div class="meter${m.left<0?" over":""}"><i style="width:${pct}%"></i></div>
@@ -442,6 +617,7 @@ function viewPrefs(){const s=S.settings;
   const sw=(id,key,label)=>`<label class="sw"><input type="checkbox" id="${id}" data-set="${key}" ${s[key]?"checked":""} aria-label="${label}"><span></span></label>`;
   return `${masthead()}
   <h2>Settings</h2>
+  ${typeof homeGuideHTML==="function"?homeGuideHTML(true):""}
   <section class="sec"><h3><span>Budget</span></h3>
     <div class="two">
       <label class="fld amt"><span>Monthly</span><input class="in sm" id="p-budget" data-num="budget" value="${plain(s.budget)}" inputmode="decimal"><span class="sm" aria-hidden="true">${cur()}</span></label>
@@ -481,7 +657,11 @@ function render(){
   window.scrollTo(0,y);
   document.querySelectorAll(".tabs a").forEach(l=>{if(l.dataset.tab===view)l.setAttribute("aria-current","page");else l.removeAttribute("aria-current")});
   const n=S.entries.filter(needsAttention).length,b=$("badge");b.hidden=!n;b.textContent=n}
-function route(){const h=location.hash.slice(1);const next=VIEWS.includes(h)?h:"today";if(next!==view){view=next;window.scrollTo(0,0)}render()}
+function route(){const h=location.hash.slice(1);const next=VIEWS.includes(h)?h:"today",changed=next!==view;
+  if(changed){view=next;window.scrollTo(0,0)}
+  render();
+  const main=$("main");if(changed&&main){main.classList.remove("is-entering");requestAnimationFrame(()=>main.classList.add("is-entering"))}}
+document.getElementById("main").addEventListener("animationend",e=>{if(e.animationName==="pageIn")e.currentTarget.classList.remove("is-entering")});
 
 function toast(msg,undo){clearTimeout(toastTimer);const r=$("toast-root");
   r.innerHTML=`<div class="toast" role="status"><span>${esc(msg)}</span>${undo?`<button type="button" id="toast-undo">Undo</button>`:""}</div>`;
