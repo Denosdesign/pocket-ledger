@@ -8,7 +8,7 @@ Open `index.html` on GitHub Pages. Add a name and amount, then tap **Save**. Use
 
 On iPhone, open the site in Safari, tap **Share**, choose **Add to Home Screen**, then tap **Add**.
 
-Entries and settings are stored locally on your device. Use **Settings → Download** to keep a backup. Clearing browser data may delete your entries.
+Entries and settings are stored locally on your device. Safari and an installed iPhone Home Screen app have separate storage, so export a backup in Safari and import it into the installed app if you already have entries. Clearing browser data may delete your entries.
 
 ## Hosting
 
