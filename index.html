@@ -259,6 +259,96 @@ h2{margin-top:42px;font-size:clamp(40px,10vw,48px)}
 @media(max-width:360px){.capture-card{padding:19px 15px 17px}.hero .fig{font-size:clamp(68px,20vw,88px)}.hero .fig.long{font-size:clamp(51px,16vw,72px)}.hero .fig.longer{font-size:clamp(35px,11vw,52px)}.hero-footer{flex-wrap:wrap;gap:4px}}
 @media(prefers-reduced-motion:reduce){.app.is-entering,.meter i,.cat .bar i,.toast{animation:none!important} .btn,.tabs a,.tabs a::before,.row,.link,.opts button,.in{transition:none!important}}
 
+
+/* Version 3: warm accent, user themes and receipt-first home */
+:root{
+  --accent:#F18A47;--accent-dark:#E27230;--accent-ink:#A54517;
+  --accent-soft:#FFF0E5;--accent-outline:#F9D2B8;--button-ink:#2E180D;
+  --surface:#FFFFFF;--hero-glow:rgba(241,138,71,.06);--shadow:rgba(99,64,37,.06);
+}
+:root[data-colour="blue"]{--accent:#547BDC;--accent-dark:#4268C7;--accent-ink:#3152AA;--accent-soft:#EEF3FF;--accent-outline:#CFDCF9;--button-ink:#FFFFFF;--hero-glow:rgba(84,123,220,.05)}
+:root[data-colour="green"]{--accent:#44A786;--accent-dark:#318A6D;--accent-ink:#206C52;--accent-soft:#EAF8F1;--accent-outline:#C8EBDA;--button-ink:#092B20;--hero-glow:rgba(68,167,134,.06)}
+:root[data-colour="rose"]{--accent:#D97591;--accent-dark:#BA5977;--accent-ink:#A53F61;--accent-soft:#FFF0F5;--accent-outline:#F5CBD9;--button-ink:#2B0C19;--hero-glow:rgba(217,117,145,.05)}
+:root[data-mode="dark"]{--bg:#171819;--surface:#212325;--ink:#F5F1ED;--muted:#AAA9A7;--line:#37393B;--soft:#2B2C2E;--warn:#F2A073;--accent-soft:#38271E;--accent-outline:#634132;--accent-ink:#F6B58C;--hero-glow:rgba(241,138,71,.08);--shadow:rgba(0,0,0,.12);color-scheme:dark}
+:root[data-mode="dark"][data-colour="blue"]{--accent-soft:#243046;--accent-outline:#344C79;--accent-ink:#A4BFFF}
+:root[data-mode="dark"][data-colour="green"]{--accent-soft:#203B32;--accent-outline:#34634F;--accent-ink:#83DEBC}
+:root[data-mode="dark"][data-colour="rose"]{--accent-soft:#3A2731;--accent-outline:#6A4050;--accent-ink:#F0A6BC}
+@media(prefers-color-scheme:dark){
+  :root[data-mode="system"]{--bg:#171819;--surface:#212325;--ink:#F5F1ED;--muted:#AAA9A7;--line:#37393B;--soft:#2B2C2E;--warn:#F2A073;--accent-soft:#38271E;--accent-outline:#634132;--accent-ink:#F6B58C;--hero-glow:rgba(241,138,71,.08);--shadow:rgba(0,0,0,.12);color-scheme:dark}
+  :root[data-mode="system"][data-colour="blue"]{--accent-soft:#243046;--accent-outline:#344C79;--accent-ink:#A4BFFF}
+  :root[data-mode="system"][data-colour="green"]{--accent-soft:#203B32;--accent-outline:#34634F;--accent-ink:#83DEBC}
+  :root[data-mode="system"][data-colour="rose"]{--accent-soft:#3A2731;--accent-outline:#6A4050;--accent-ink:#F0A6BC}
+}
+html,body{transition:background-color .24s ease,color .24s ease}
+.top a:hover,.top a[aria-current="page"],.eyebrow,.hero .fig small:first-child,.link.ink,.link[aria-pressed="true"],.install-actions button,.install-icon,.tabs a[aria-current="page"],.tabs .count,.capture-card .recent button,.opts button:hover:not([aria-pressed="true"]),.types button[aria-pressed="true"]{color:var(--accent-ink)}
+.hero{margin-top:42px;padding:4px 0 18px;position:relative}
+.hero::before{content:"";position:absolute;z-index:-1;inset:-20px -24px 8px;background:linear-gradient(155deg,var(--hero-glow),transparent 72%);pointer-events:none}
+.hero-title{margin-top:15px}
+.hero .fig{margin-top:18px}
+.hero-footer{margin-top:23px}
+.meter{height:6px;margin-top:14px}
+.btn{color:var(--button-ink);box-shadow:0 4px 18px var(--shadow)}
+.btn:hover:not(:disabled){box-shadow:0 7px 20px var(--shadow)}
+.capture-card,.receipt-stack{background:var(--surface);box-shadow:0 7px 28px var(--shadow)}
+.install-card{background:var(--accent-soft);border-color:var(--accent-outline)}
+.install-card p{color:var(--muted)}
+.install-actions button{color:var(--accent-ink)}
+.opts button[aria-pressed="true"]{color:var(--button-ink)}
+.tabs{background:var(--bg);border-top:1px solid var(--line)}
+.tabs nav{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 80px minmax(0,1fr) minmax(0,1fr);align-items:center;max-width:520px;min-height:69px}
+.tabs a{min-height:65px;padding-top:7px;white-space:nowrap;font-size:12px}
+.tabs a[aria-current="page"]{font-weight:500}
+.tabs a::before{top:auto;bottom:8px;height:3px;border-radius:5px;left:calc(50% - 12px);width:24px}
+.tabs .count{margin-left:2px}
+.new-tab{align-self:center;justify-self:center;display:grid;place-items:center;width:62px;height:62px;border:0;border-radius:20px;background:var(--accent);color:var(--button-ink);box-shadow:0 6px 22px var(--shadow);transform:translateY(-9px);transition:transform .24s cubic-bezier(.2,.85,.2,1),background-color .2s,box-shadow .2s;font-weight:400}
+.new-tab span[aria-hidden]{font-family:var(--body);font-size:38px;line-height:1;transform:translateY(-1px)}
+.new-tab:hover{background:var(--accent-dark);transform:translateY(-11px);box-shadow:0 9px 26px var(--shadow)}
+.new-tab:active{transform:translateY(-7px) scale(.94)}
+.today-history{margin-top:37px}
+.today-history .section-head{margin-bottom:13px}
+.today-history .section-head h3{font-size:20px}
+.receipt-stack{border:1px solid var(--line);border-radius:21px;overflow:hidden;padding:6px 19px 0}
+.receipt-stack .row{min-height:61px;border-radius:0;column-gap:10px}
+.receipt-stack .row:last-of-type{border-bottom:0}
+.receipt-stack .row .nm{font-weight:500;font-size:15px}
+.receipt-stack .row .meta{font-size:11px}
+.receipt-stack .row .v{font-size:14px}
+.receipt-stack .row:hover{padding-left:0;padding-right:0;background:var(--accent-soft)}
+.receipt-footer{border-top:1px dashed var(--line);padding:16px 0 18px;display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;color:var(--muted)}
+.receipt-footer strong{font-size:15px;font-weight:500;color:var(--ink)}
+.empty-receipt{text-align:center;padding:34px 10px 39px}
+.empty-receipt-mark{display:grid;place-items:center;width:46px;height:46px;margin:0 auto 15px;border-radius:16px;background:var(--accent-soft);color:var(--accent-ink);font-size:28px;line-height:1}
+.empty-receipt strong{display:block;font-size:15px;font-weight:500}
+.empty-receipt p{color:var(--muted);font-size:13px;margin:6px auto 0;max-width:220px}
+.all-receipts{display:inline-flex;gap:8px;align-items:center;margin:16px 0 0;color:var(--accent-ink);text-decoration:none;font-size:13px;font-weight:500}
+.all-receipts span{transition:transform .2s ease}
+.all-receipts:hover span{transform:translateX(3px)}
+.palette-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:17px}
+.palette-choice{display:flex;align-items:center;gap:10px;position:relative;padding:11px 12px;text-align:left;border:1px solid var(--line);border-radius:13px;background:var(--surface);font-size:13px;transition:border-color .2s,background-color .2s,transform .2s}
+.palette-choice[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.palette-choice:active{transform:scale(.97)}
+.palette-dot{width:22px;height:22px;border-radius:8px;flex:none}
+.palette-tick{margin-left:auto;color:var(--accent-ink)}
+.theme-choice{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;border-radius:12px;background:var(--soft);padding:4px;margin-top:15px}
+.theme-choice button{border:0;border-radius:9px;background:transparent;color:var(--muted);padding:9px 0;font-size:13px;transition:background-color .18s,color .18s}
+.theme-choice button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 2px 7px var(--shadow)}
+.custom-cat-list{margin-top:22px;border-top:1px solid var(--line)}
+.custom-cat{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr) auto;gap:10px;align-items:center;border-bottom:1px solid var(--line);padding:8px 0}
+.custom-cat strong{min-width:0;font-size:13px;font-weight:500;overflow-wrap:anywhere}
+.custom-cat .in{padding:7px 0;font-size:13px}
+.custom-cat .link{font-size:12px}
+.review-chooser{margin-top:10px;max-width:330px}
+.review-chooser .in{font-size:14px;padding:7px 0}
+.category-proposal{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;padding:9px 12px;border:1px solid var(--accent-outline);border-radius:12px;background:var(--accent-soft);font-size:13px}
+.category-proposal strong{color:var(--accent-ink);font-weight:500}
+.category-proposal button{font-size:12px}
+.app.is-leaving{animation:pageOut .12s ease-in both;pointer-events:none}
+.app.is-entering{animation:pageIn .29s cubic-bezier(.17,.85,.2,1) both}
+@keyframes pageOut{from{opacity:1;transform:translateY(0)}to{opacity:.87;transform:translateY(-5px)}}
+@keyframes pageIn{from{opacity:.83;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:360px){.tabs nav{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 65px minmax(0,1fr) minmax(0,1fr)}.new-tab{width:56px;height:56px}.receipt-stack{padding:6px 12px 0}.receipt-stack .row{column-gap:7px}.receipt-stack .row .meta{font-size:10px}.custom-cat{grid-template-columns:minmax(0,.75fr) minmax(0,1.2fr) auto;gap:6px}}
+@media(prefers-reduced-motion:reduce){html,body,.new-tab,.theme-choice button,.palette-choice,.app.is-leaving,.app.is-entering{animation:none!important;transition:none!important}}
+
 </style>
 </head>
 <body>
@@ -266,12 +356,14 @@ h2{margin-top:42px;font-size:clamp(40px,10vw,48px)}
 <div class="tabs"><nav aria-label="Sections">
   <a href="#today" data-tab="today">Today</a>
   <a href="#receipt" data-tab="receipt">Receipt</a>
+  <button type="button" class="new-tab" id="new-tab" aria-label="New expense" title="New expense"><span aria-hidden="true">+</span><span class="sr">New expense</span></button>
   <a href="#review" data-tab="review">Review<span class="count" id="badge" hidden></span></a>
   <a href="#overview" data-tab="overview">Overview</a>
 </nav></div>
 <div id="sheet-root"></div>
 <div id="toast-root"></div>
 <div id="install-root"></div>
+<div id="category-root"></div>
 <script>
 /* iPhone Home Screen instructions. Web browsers cannot install an iOS PWA on the user's behalf. */
 (function(){
@@ -334,7 +426,10 @@ h2{margin-top:42px;font-size:clamp(40px,10vw,48px)}
 
 "use strict";
 const STORE_KEY="pocket-ledger-v1";
-const CATEGORIES=["Food","Groceries","Transport","Clothing","Shopping","Entertainment","Health","Bills","Home","Travel","Other"];
+const BASE_CATEGORIES=["Food","Groceries","Transport","Clothing","Shopping","Entertainment","Health","Bills","Home","Travel","Other"];
+const categories=()=>[...BASE_CATEGORIES,...(S.customCategories||[])];
+const COLOURWAYS={apricot:{name:"Apricot",colour:"#F18A47"},blue:{name:"Blue",colour:"#547BDC"},green:{name:"Jade",colour:"#44A786"},rose:{name:"Rose",colour:"#D97591"}};
+const THEME_MODES=["light","dark","system"];
 const SPEND=new Set(["purchase","unknown","adjustment"]);
 const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const MONTHS_LONG=["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -368,12 +463,17 @@ function isoWeek(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.get
 const framed=(()=>{try{return window.self!==window.top}catch{return true}})();
 
 function defaults(){return{entries:[],dict:{},card:[],recon:{last:null,log:[]},ai:{requests:0,cost:0,lastError:""},
-  settings:{budget:600000,currency:"HK$",ai:false,key:"",model:"",deny:true,preferLocal:true},seeded:false}}
+  customCategories:[],aiResults:{},settings:{budget:600000,currency:"HK$",ai:false,key:"",model:"",deny:true,preferLocal:true,suggestNew:true,palette:"apricot",theme:"light"},seeded:false}}
 let S=defaults(),storageOK=true;
 function load(){
   try{const raw=localStorage.getItem(STORE_KEY);if(raw){const p=JSON.parse(raw);const d=defaults();S={...d,...p,settings:{...d.settings,...p.settings},recon:{...d.recon,...p.recon},ai:{...d.ai,...p.ai}}}}
   catch{storageOK=false}
   S.settings.currency=safeCurrency(S.settings.currency);
+  S.settings.palette=COLOURWAYS[S.settings.palette]?S.settings.palette:"apricot";
+  S.settings.theme=THEME_MODES.includes(S.settings.theme)?S.settings.theme:"light";
+  S.customCategories=Array.isArray(S.customCategories)?S.customCategories.filter(x=>typeof x==="string"&&x.length<=28&&!BASE_CATEGORIES.some(c=>norm(c)===norm(x))).slice(0,32):[];
+  if(!S.aiResults||typeof S.aiResults!=="object"||Array.isArray(S.aiResults))S.aiResults={};
+  applyAppearance();
 }
 function persist(){try{localStorage.setItem(STORE_KEY,JSON.stringify(S));storageOK=true}catch{storageOK=false}}
 
@@ -395,20 +495,62 @@ function rangeSnapshot(from,to){return JSON.stringify(S.entries.filter(e=>SPEND.
 function verifiedReconciliations(){return (S.recon.log||[]).filter(r=>r&&validDate(r.from)&&validDate(r.to)&&r.from<=r.to&&
   (typeof r.snapshot==="string"?r.snapshot===rangeSnapshot(r.from,r.to):spendIn(r.from,r.to)===r.logged))}
 const isProvisional=(d,verified=verifiedReconciliations())=>!verified.some(r=>r.from<=d&&r.to>=d);
-const needsReview=e=>e.type==="purchase"&&(e.status==="none"||e.status==="review");
+const needsReview=e=>e.type==="purchase"&&["none","review","proposal"].includes(e.status);
 const needsAttention=e=>needsReview(e)||(e.type==="purchase"&&e.status==="ai");
 const aiReady=()=>S.settings.ai&&S.settings.key&&S.settings.model;
 function monthStats(ref=today()){const d=toDate(ref);const first=ymd(new Date(d.getFullYear(),d.getMonth(),1));const lastD=new Date(d.getFullYear(),d.getMonth()+1,0);const last=ymd(lastD);
   const spent=spendIn(first,last),budget=S.settings.budget||0;return{first,last,spent,budget,left:budget-spent,daysLeft:lastD.getDate()-d.getDate()+1,name:MONTHS_LONG[d.getMonth()]}}
 
+/* Taxonomy is owned by the person, not the AI. Similarity checks run locally. */
+const CATEGORY_HINTS={
+  Food:["restaurant","restaurants","dining","takeaway","takeout","cafe","cafes","coffee","meals","餐飲","外食","飲食"],
+  Groceries:["grocery","supermarket","supermarkets","market","超市","雜貨"],
+  Transport:["taxi","taxis","bus","public transport","交通","車費"],
+  Clothing:["clothes","clothing","fashion","apparel","服飾","衣服"],
+  Shopping:["retail","general shopping","購物"],
+  Entertainment:["leisure","movies","hobbies","娛樂","消遣"],
+  Health:["medical","medicine","doctor","healthcare","醫療","藥物"],
+  Bills:["utilities","subscriptions","subscription","utilities bills","帳單","訂閱"],
+  Home:["household","furniture","家居"],
+  Travel:["holidays","holiday","vacation","trip","旅行","旅遊"]
+};
+const categoryKey=s=>norm(String(s||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"")).replace(/(?:ies|s)$/,(m)=>m==="ies"?"y":"");
+function editDistance(a,b){const row=Array.from({length:b.length+1},(_,i)=>i);
+  for(let i=1;i<=a.length;i++){let prev=row[0];row[0]=i;for(let j=1;j<=b.length;j++){const hold=row[j];row[j]=Math.min(row[j]+1,row[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=hold}}return row[b.length]}
+function relatedCategories(label){const k=categoryKey(label);if(!k)return [];
+  return categories().filter(cat=>{const n=categoryKey(cat);
+    if(n===k)return true;
+    if(k.length>=4&&n.length>=4&&(k.includes(n)||n.includes(k)))return true;
+    if(k.length>=5&&n.length>=5&&editDistance(k,n)<=2)return true;
+    if(CATEGORY_HINTS[cat]?.some(v=>categoryKey(v)===k))return true;
+    return false}).slice(0,4)}
+function cleanCategory(value){return String(value||"").trim().replace(/\s+/g," ").replace(/[^\p{L}\p{N} &()+/]/gu,"").slice(0,28).trim()}
+function addCategory(value,force=false){const name=cleanCategory(value),similar=relatedCategories(name);
+  if(!name||name.length<2)return{error:"Enter at least two letters."};
+  if(categories().some(c=>categoryKey(c)===categoryKey(name)))return{error:`${similar[0]||name} already exists.`};
+  if(S.customCategories.length>=32)return{error:"You've reached the custom category limit. Merge similar ones first."};
+  if(similar.length&&!force)return{similar,name};
+  S.customCategories.push(name);S.aiResults={};aiCache.clear();persist();return{added:name}}
+function mergeCategory(from,to){if(!S.customCategories.includes(from)||!categories().includes(to)||from===to)return false;
+  for(const e of S.entries){if(e.category===from){e.category=to;if(e.status!=="approved")e.status="approved"}
+    if(e.suggestedCategory===from)delete e.suggestedCategory}
+  for(const[k,v]of Object.entries(S.dict))if(v===from)S.dict[k]=to;
+  S.customCategories=S.customCategories.filter(x=>x!==from);S.aiResults={};aiCache.clear();persist();return true}
+function applyAppearance(){const s=S.settings,root=document.documentElement;
+  root.dataset.colour=COLOURWAYS[s.palette]?s.palette:"apricot";
+  root.dataset.mode=THEME_MODES.includes(s.theme)?s.theme:"light";
+  const dark=root.dataset.mode==="dark"||(root.dataset.mode==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content",dark?"#171819":"#FFFFFF");
+}
+
 /* Classification: local dictionary first, AI only for unseen labels */
 function lookup(name){const k=norm(name);if(!k)return null;
-  if(S.dict[k])return{cat:S.dict[k],src:"user"};
+  if(S.dict[k]&&categories().includes(S.dict[k]))return{cat:S.dict[k],src:"user"};
   if(AMBIGUOUS.has(k))return{cat:null,src:"ambiguous"};
   if(!S.settings.preferLocal&&aiReady())return null;
   if(BUILTIN.has(k))return{cat:BUILTIN.get(k),src:"builtin"};
   const toks=k.split(" ");
-  for(const t of toks)if(S.dict[t])return{cat:S.dict[t],src:"user"};
+  for(const t of toks)if(S.dict[t]&&categories().includes(S.dict[t]))return{cat:S.dict[t],src:"user"};
   for(const t of toks)if(BUILTIN.has(t))return{cat:BUILTIN.get(t),src:"builtin"};
   for(const[key,cat]of BUILTIN)if(/[㐀-鿿]/.test(key)&&key.length>=2&&k.includes(key))return{cat,src:"builtin"};
   return null}
@@ -419,6 +561,9 @@ function categorize(e){
     else{e.category=hit.cat;e.status=hit.src==="user"?"approved":"auto";delete e.why}return false}
   e.category=null;e.status="none";delete e.why;return true}
 function setCategory(e,cat){
+  if(!categories().includes(cat))return 0;
+  delete e.suggestedCategory;
+  delete S.aiResults[norm(e.name)];
   e.category=cat;e.status="approved";delete e.why;const k=norm(e.name);let others=0;
   if(k&&!AMBIGUOUS.has(k)&&e.type==="purchase"){S.dict[k]=cat;
     for(const o of S.entries)if(o!==e&&o.type==="purchase"&&norm(o.name)===k&&["none","review","ai","pending","auto"].includes(o.status)){o.category=cat;o.status="approved";delete o.why;others++}}
@@ -436,9 +581,11 @@ function httpMsg(s,m){
 async function classifyRemote(label,model=S.settings.model,key=S.settings.key){
   if(!navigator.onLine)throw new Error("You're offline. The entry is saved; categorise it later.");
   if(/^anthropic\//i.test(model)||/claude/i.test(model))throw new Error("Anthropic models are excluded from this project. Choose another model.");
-  const body={model,temperature:0,max_tokens:60,usage:{include:true},
+  const allowed=categories(),propose=S.settings.suggestNew===true;
+  const instruction=`Sort a Hong Kong purchase label. Use an EXACT existing category when possible: ${allowed.join(", ")}. Prefer existing broad categories over creating synonyms. Unclear means Review. ${propose?'If absolutely none fits, use Review and propose one short broad category in new_category. Never propose a synonym or narrower version of an existing category.':'Never propose a new category.'} JSON only: {"category":"existing name or Review"${propose?',"new_category":"short category or empty"':''}}.`;
+  const body={model,temperature:0,max_tokens:75,usage:{include:true},
     provider:{ignore:["anthropic"],...(S.settings.deny?{data_collection:"deny"}:{})},
-    messages:[{role:"system",content:`Classify a short personal purchase label from Hong Kong into one spending category. Labels may be English, Chinese, Cantonese abbreviations or mixed. Allowed categories: ${CATEGORIES.join(", ")}. If the label could reasonably be several kinds of purchase, or you don't recognise it, answer "Review". You are not given the price and must not guess the item. Reply with JSON only: {"category":"<allowed value or Review>","review_required":true|false}`},{role:"user",content:label}]};
+    messages:[{role:"system",content:instruction},{role:"user",content:label}]};
   const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),15000);let res;
   try{res=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",signal:ctrl.signal,headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json","X-Title":"Pocket Ledger"},body:JSON.stringify(body)})}
   catch(err){clearTimeout(timer);throw new Error(err.name==="AbortError"?"The provider took longer than 15 seconds. The entry is saved.":framed?"Couldn't reach OpenRouter. This Claude preview blocks outside requests; use your self-hosted copy.":"Couldn't reach OpenRouter. Check your connection.")}
@@ -447,17 +594,26 @@ async function classifyRemote(label,model=S.settings.model,key=S.settings.key){
   S.ai.requests++;if(typeof data?.usage?.cost==="number")S.ai.cost+=data.usage.cost;
   const text=data?.choices?.[0]?.message?.content||"";let j=null;try{j=JSON.parse((text.match(/\{[\s\S]*\}/)||[""])[0])}catch{}
   if(!j)throw new Error("The model replied in an unexpected format, so the entry stays uncategorised.");
-  const cat=CATEGORIES.find(c=>c.toLowerCase()===String(j.category||"").toLowerCase().trim());
-  return cat?{category:cat,review:j.review_required===true}:{category:null,review:true}}
+  const cat=allowed.find(c=>categoryKey(c)===categoryKey(j.category));
+  const candidate=propose?cleanCategory(j.new_category||""):"";
+  const suggestions=candidate?relatedCategories(candidate):[];
+  if(cat)return{category:cat,review:j.review_required===true};
+  if(candidate&&!suggestions.length&&candidate.length>=2)return{category:null,review:true,newCategory:candidate};
+  return{category:null,review:true,similar:suggestions}}
 function queueAI(ids){
   for(const id of ids){const e=find(id);if(!e||aiPending.has(id))continue;aiPending.add(id);e.status="pending";
     aiChain=aiChain.then(()=>runAI(id)).catch(()=>{})}
   render()}
 async function runAI(id){
   const e=find(id);if(!e||e.status!=="pending"){aiPending.delete(id);return}
-  const k=norm(e.name);
-  try{let r=aiCache.get(k);if(!r){r=await classifyRemote(e.name);aiCache.set(k,r)}
-    const cur=find(id);if(cur&&cur.status==="pending"){if(r.review||!r.category){cur.category=null;cur.status="review";cur.why="AI wasn't sure"}else{cur.category=r.category;cur.status="ai"}}
+  const k=norm(e.name),signature=categories().join("|")+"|"+S.settings.suggestNew;
+  try{let r=aiCache.get(k+"|"+signature)||S.aiResults[k]?.signature===signature&&S.aiResults[k].result;
+    if(!r){r=await classifyRemote(e.name);aiCache.set(k+"|"+signature,r);
+      S.aiResults[k]={signature,result:r};const keys=Object.keys(S.aiResults);if(keys.length>300)delete S.aiResults[keys[0]]}
+    const cur=find(id);if(cur&&cur.status==="pending"){
+      if(r.newCategory){cur.category=null;cur.status="proposal";cur.suggestedCategory=r.newCategory;cur.why="New category suggested"}
+      else if(r.review||!r.category){cur.category=null;cur.status="review";cur.why=r.similar?.length?"Similar to "+r.similar.join(", "):"AI wasn't sure"}
+      else{cur.category=r.category;cur.status="ai";delete cur.suggestedCategory}}
     S.ai.lastError=""}
   catch(err){const cur=find(id);if(cur&&cur.status==="pending")cur.status="none";S.ai.lastError=err.message;if(err.status===403)S.settings.model=""}
   finally{aiPending.delete(id);persist();render()}}
@@ -465,13 +621,13 @@ async function runAI(id){
 /* UI state */
 let view="today",draft={name:"",amt:"",date:today(),unknown:false},capErr="",receiptFilter="all";
 let recDraft=null,cardDraft={bal:"",date:today()},models=null,modelQuery="",modelMsg="",testMsg="",showKey=false,backupText="",armed={};
-let sheet=null,sheetReturnFocus=null,toastTimer=null;
+let sheet=null,sheetReturnFocus=null,toastTimer=null,categoryDraft="",categoryConfirm="",categoryFeedback="",mergeChoice={};
 
 const cur=()=>esc(S.settings.currency);
 function fig(c,cls=""){const a=Math.abs(c),whole=Math.floor(a/100).toLocaleString("en-US"),cents=a%100;
   const scale=whole.length>=8?"longer":whole.length>=6?"long":"";
   return `<div class="fig ${cls} ${scale}" aria-label="${esc(money(c))}"><small>${cur()}</small>${c<0?"−":""}${whole}${cents?`<small style="margin-left:4px">.${pad(cents)}</small>`:""}</div>`}
-const masthead=()=>`<header class="top"><b><span class="brand-mark" aria-hidden="true"></span>Pocket Ledger</b><a href="#prefs">Settings</a></header>`;
+const masthead=()=>`<header class="top"><b><span class="brand-mark" aria-hidden="true"></span>Pocket Ledger</b><a href="#prefs"${view==="prefs"?' aria-current="page"':''}>Settings</a></header>`;
 const hasExamples=()=>S.entries.some(e=>e.example)||S.card.some(c=>c.example);
 function foot(){const p=[];
   if(!storageOK)p.push(`<span style="color:var(--warn)">This browser isn't saving. Copy a backup in Settings before closing.</span>`);
@@ -479,7 +635,7 @@ function foot(){const p=[];
   return p.length?`<p class="foot">${p.join("<br>")}</p>`:""}
 function metaOf(e){
   if(e.type==="unknown")return"Name unknown";if(e.type==="adjustment")return"Adjustment";if(e.type==="repayment")return"Repayment";
-  if(e.status==="pending")return"Sorting…";if(needsReview(e))return`<span class="meta warn">Needs category</span>`;
+  if(e.status==="pending")return"Sorting…";if(e.status==="proposal")return`<span class="meta warn">New category suggested</span>`;if(needsReview(e))return`<span class="meta warn">Needs category</span>`;
   return e.category?esc(e.category)+(e.status==="ai"?" · Suggested":""):""}
 function rowHTML(e){const m=metaOf(e);
   return `<button type="button" class="row ${e.type}" data-act="edit" data-id="${e.id}"><span class="nm">${esc(e.name)}</span><span class="meta">${m}</span><span class="v">${money(e.amount)}</span></button>`}
@@ -496,24 +652,13 @@ function viewToday(){const t=today(),tot=spendIn(t,t),m=monthStats(),todays=S.en
     <div class="hero-footer"><span class="budget-remain">${m.left>=0?`${money(m.left)} remaining`:`${money(-m.left)} over budget`}</span><span class="budget-context">${m.name} budget</span></div>
     <div class="meter${m.left<0?" over":""}"><i style="width:${m.budget?Math.min(100,m.spent/m.budget*100):0}%"></i></div>
   </section>
-  <section class="capture-card" aria-label="New expense">
-    <div class="section-head"><h3>New expense</h3><span>Quick entry</span></div>
-  <form id="cap" autocomplete="off" novalidate>
-    <div class="cap">
-      <label><span class="sr">What was it</span><input class="in" id="cap-name" data-draft="name" value="${esc(draft.unknown?"":draft.name)}" placeholder="${draft.unknown?"Name forgotten":"What was it"}" ${draft.unknown?"disabled":""} enterkeyhint="next" autocapitalize="words" maxlength="40"></label>
-      <label class="amt"><span class="sr">Amount</span><input class="in" id="cap-amt" data-draft="amt" value="${esc(draft.amt)}" inputmode="decimal" placeholder="0" enterkeyhint="done"><span aria-hidden="true">${cur()}</span></label>
+  <section class="history today-history" aria-label="Today’s entries">
+    <div class="section-head"><h3>Today’s entries</h3><span>${todays.length} ${todays.length===1?"entry":"entries"}</span></div>
+    <div class="receipt-stack">
+      ${todays.length?`${todays.map(rowHTML).join("")}<div class="receipt-footer"><span>Today's total</span><strong>${money(tot)}</strong></div>`:`<div class="empty-receipt"><span class="empty-receipt-mark" aria-hidden="true">+</span><strong>No entries yet</strong><p>Tap the + button below to add your first expense.</p></div>`}
     </div>
-    ${rec.length&&!draft.unknown?`<div class="recent">${rec.map(r=>`<button type="button" data-act="pick" data-label="${esc(r.label)}">${esc(r.label)}</button>`).join("")}</div>`:""}
-    <div class="acts">
-      <span class="link${draft.date!==t?" ink":""}">${esc(dayLabel(draft.date))}<input type="date" id="cap-date" data-draft="date" value="${draft.date}" max="${t}" aria-label="Purchase date"></span>
-      <button type="button" class="link" data-act="toggle-unknown" aria-pressed="${draft.unknown}">Forgot name</button>
-      <button class="btn push" type="submit">Save</button>
-    </div>
-    <p class="err" role="status">${esc(capErr)}</p>
-  </form>
+    <a class="all-receipts" href="#receipt">View all receipts <span aria-hidden="true">→</span></a>
   </section>
-  <section class="history"><div class="section-head"><h3>Today’s entries</h3><span>${todays.length} ${todays.length===1?"entry":"entries"}</span></div>
-  <div class="list">${todays.length?todays.map(rowHTML).join(""):`<p class="empty">Nothing recorded today.</p>`}</div></section>
   ${typeof homeGuideHTML==="function"?homeGuideHTML():""}
   ${foot()}`}
 
@@ -548,7 +693,7 @@ function viewReview(){const t=today();
   if(!recDraft)recDraft={from:latest&&latest<t?addDays(latest,1):addDays(t,-6),to:t,stmt:""};
   if(recDraft.from>recDraft.to)recDraft.from=recDraft.to;
   const logged=spendIn(recDraft.from,recDraft.to),stmt=parseMoney(recDraft.stmt,false,true);
-  const opts=e=>`<div class="opts">${CATEGORIES.map(c=>`<button type="button" data-act="setcat" data-id="${e.id}" data-cat="${c}" aria-pressed="${e.category===c}">${c}</button>`).join("")}</div>`;
+  const opts=e=>`<div class="review-chooser"><label class="sr" for="cat-${e.id}">Category for ${esc(e.name)}</label><select class="in sm" id="cat-${e.id}" data-review-cat="${e.id}"><option value="">Choose category</option>${categories().map(c=>`<option value="${esc(c)}" ${e.category===c?"selected":""}>${esc(c)}</option>`).join("")}</select></div>${e.status==="proposal"&&e.suggestedCategory?`<div class="category-proposal"><span>Suggested: <strong>${esc(e.suggestedCategory)}</strong></span><button class="link ink" type="button" data-act="accept-proposal" data-id="${e.id}">Review &amp; add</button></div>`:""}`;
   const noneCount=pend.filter(e=>e.status==="none").length;
   const diffHTML=reconcileFeedback(logged,stmt);
   return `${masthead()}
@@ -618,15 +763,28 @@ function viewPrefs(){const s=S.settings;
   return `${masthead()}
   <h2>Settings</h2>
   ${typeof homeGuideHTML==="function"?homeGuideHTML(true):""}
+  <section class="sec appearance-section"><h3><span>Appearance</span></h3>
+    <p class="note">Choose your accent colour and display mode.</p>
+    <div class="palette-grid" role="group" aria-label="Accent colour">${Object.entries(COLOURWAYS).map(([id,p])=>`<button type="button" class="palette-choice" data-act="palette" data-v="${id}" aria-pressed="${s.palette===id}"><span class="palette-dot" style="background:${p.colour}"></span><span>${p.name}</span>${s.palette===id?`<span class="palette-tick" aria-hidden="true">✓</span>`:""}</button>`).join("")}</div>
+    <div class="theme-choice" role="group" aria-label="Display theme">${THEME_MODES.map(m=>`<button type="button" data-act="theme" data-v="${m}" aria-pressed="${s.theme===m}">${m[0].toUpperCase()+m.slice(1)}</button>`).join("")}</div>
+  </section>
   <section class="sec"><h3><span>Budget</span></h3>
     <div class="two">
       <label class="fld amt"><span>Monthly</span><input class="in sm" id="p-budget" data-num="budget" value="${plain(s.budget)}" inputmode="decimal"><span class="sm" aria-hidden="true">${cur()}</span></label>
       <label class="fld"><span>Currency</span><input class="in sm" id="p-cur" data-set="currency" value="${esc(s.currency)}" maxlength="5"></label>
     </div>
   </section>
+  <section class="sec"><h3><span>Categories</span><span>${categories().length} total</span></h3>
+    <p class="note">Create categories locally, without using AI. Similar names are flagged before they are added.</p>
+    <label class="fld"><span>New category</span><input class="in sm" id="p-category-name" data-category-input="1" value="${esc(categoryDraft)}" maxlength="28" placeholder="e.g. Pet care" autocomplete="off"></label>
+    ${categoryFeedback?`<p class="note${categoryConfirm?" warn":""}" role="status">${esc(categoryFeedback)}</p>`:""}
+    <div class="acts"><button class="btn" type="button" data-act="add-category">${categoryConfirm?"Add anyway":"Add category"}</button>${categoryConfirm?`<button class="link" type="button" data-act="cancel-category">Use an existing one</button>`:""}</div>
+    ${S.customCategories.length?`<div class="custom-cat-list">${S.customCategories.map(c=>`<div class="custom-cat"><strong>${esc(c)}</strong><label class="sr" for="merge-${esc(norm(c))}">Merge ${esc(c)} into</label><select id="merge-${esc(norm(c))}" data-merge="${esc(c)}" class="in sm"><option value="">Merge into…</option>${categories().filter(x=>x!==c).map(x=>`<option value="${esc(x)}" ${mergeChoice[c]===x?"selected":""}>${esc(x)}</option>`).join("")}</select><button class="link ink" type="button" data-act="merge-category" data-cat="${esc(c)}">Merge</button></div>`).join("")}</div>`:""}
+  </section>
   <section class="sec"><h3><span>AI categories</span><span>OpenRouter</span></h3>
     <div class="line"><span>Suggest categories for new names</span>${sw("p-ai","ai","Suggest categories for new names")}</div>
     <div class="line"><span>Check known names first</span>${sw("p-local","preferLocal","Check known names first")}</div>
+    <div class="line"><span>Suggest a new category when needed<small>Requires your approval in Review</small></span>${sw("p-propose","suggestNew","Suggest new categories")}</div>
     <div class="line"><span>Avoid providers that keep data</span>${sw("p-deny","deny","Avoid providers that keep data")}</div>
     <label class="fld"><span>API key</span><input class="in sm" id="p-key" data-set="key" type="${showKey?"text":"password"}" value="${esc(s.key)}" placeholder="sk-or-…" autocomplete="off" spellcheck="false"></label>
     <div class="acts" style="margin-top:4px"><button class="link" data-act="toggle-key">${showKey?"Hide":"Show"}</button>${s.key?`<button class="link" data-act="remove-key">Remove</button>`:""}</div>
@@ -638,7 +796,7 @@ function viewPrefs(){const s=S.settings;
     ${testMsg?`<p class="note${testMsg.startsWith("Connected")?"":" warn"}">${esc(testMsg)}</p>`:""}
     ${S.ai.lastError&&!testMsg?`<p class="note warn">${esc(S.ai.lastError)}</p>`:""}
     <div class="line" style="margin-top:8px"><span>Usage<small>${S.ai.requests} request${S.ai.requests===1?"":"s"} · US$${S.ai.cost.toFixed(4)}</small></span><button class="link" data-act="reset-usage">Reset</button></div>
-    <p class="note">Only the name you typed and the category list are sent. Anthropic models are excluded. The key is kept in this browser, so use a low-limit key you can revoke.${framed?" AI works in your self-hosted copy, not this preview.":""}</p>
+    <p class="note">Previously recognised names are handled locally. Only unfamiliar purchase labels and category names are sent when AI is enabled. Suggestions never create categories automatically. Anthropic models are excluded. Your key stays in this browser.${framed?" AI requires your hosted copy.":""}</p>
   </section>
   <section class="sec"><h3><span>Learned names</span><span>${dict.length||""}</span></h3>
     ${dict.length?dict.map(([k,v])=>`<div class="line"><span>${esc(k)}</span><span class="v muted" style="color:var(--muted)">${esc(v)}<button class="x" data-act="forget" data-k="${esc(k)}" aria-label="Forget ${esc(k)}">×</button></span></div>`).join(""):`<p class="empty">Categories you choose are remembered here.</p>`}
@@ -657,10 +815,17 @@ function render(){
   window.scrollTo(0,y);
   document.querySelectorAll(".tabs a").forEach(l=>{if(l.dataset.tab===view)l.setAttribute("aria-current","page");else l.removeAttribute("aria-current")});
   const n=S.entries.filter(needsAttention).length,b=$("badge");b.hidden=!n;b.textContent=n}
-function route(){const h=location.hash.slice(1);const next=VIEWS.includes(h)?h:"today",changed=next!==view;
-  if(changed){view=next;window.scrollTo(0,0)}
-  render();
-  const main=$("main");if(changed&&main){main.classList.remove("is-entering");requestAnimationFrame(()=>main.classList.add("is-entering"))}}
+let routeTimer=0;
+function route(){const h=location.hash.slice(1),next=VIEWS.includes(h)?h:"today";
+  clearTimeout(routeTimer);const main=$("main");
+  if(next===view){main.classList.remove("is-leaving");render();return}
+  const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const enter=()=>{view=next;main.classList.remove("is-leaving","is-entering");main.removeAttribute("aria-busy");
+    window.scrollTo({top:0,behavior:"instant"});render();
+    if(!reduced)requestAnimationFrame(()=>main.classList.add("is-entering"))};
+  if(reduced){enter();return}
+  main.classList.remove("is-entering");main.classList.add("is-leaving");main.setAttribute("aria-busy","true");
+  routeTimer=setTimeout(enter,120)}
 document.getElementById("main").addEventListener("animationend",e=>{if(e.animationName==="pageIn")e.currentTarget.classList.remove("is-entering")});
 
 function toast(msg,undo){clearTimeout(toastTimer);const r=$("toast-root");
@@ -700,11 +865,12 @@ function renderSheet(){if(!sheet){closeSheet();return}const s=sheet,t=today();
     <div class="types" role="group" aria-label="Type">${types.map(([k,l])=>`<button type="button" data-sact="type" data-v="${k}" aria-pressed="${s.type===k}">${l}</button>`).join("")}</div>
     ${hint?`<p class="note">${hint}</p>`:""}
     <label class="fld"><span>Name</span><input class="in" id="s-name" data-s="name" value="${esc(s.name)}" placeholder="${s.type==="unknown"?"???":s.type==="repayment"?"Card repayment":s.type==="adjustment"?"Adjustment":"Lunch"}" maxlength="40" autocapitalize="words"></label>
+    ${!s.id&&s.type==="purchase"&&recentLabels().length?`<div class="recent">${recentLabels().slice(0,4).map(r=>`<button type="button" data-sact="recent" data-label="${esc(r.label)}">${esc(r.label)}</button>`).join("")}</div>`:""}
     <div class="two">
       <label class="fld amt"><span>Amount</span><input class="in" id="s-amt" data-s="amt" value="${esc(s.amt)}" inputmode="${s.type==="adjustment"?"text":"decimal"}" placeholder="0"><span aria-hidden="true">${cur()}</span></label>
       <label class="fld"><span>Date</span><input class="in" type="date" id="s-date" data-s="date" value="${s.date}" max="${t}"></label>
     </div>
-    ${s.type==="purchase"?`<label class="fld"><span>Category</span><select class="in" id="s-cat" data-s="category"><option value="">${s.id?"None":"Sort automatically"}</option>${CATEGORIES.map(c=>`<option${s.category===c?" selected":""}>${c}</option>`).join("")}</select></label>`:""}
+    ${s.type==="purchase"?`<label class="fld"><span>Category</span><select class="in" id="s-cat" data-s="category"><option value="">${s.id?"None":"Sort automatically"}</option>${categories().map(c=>`<option value="${esc(c)}"${s.category===c?" selected":""}>${esc(c)}</option>`).join("")}</select></label><button type="button" class="link ink" data-sact="custom-category">+ Create a category</button>`:""}
     <p class="err" role="status">${esc(s.err)}</p>
     <div class="acts" style="margin-top:24px">${s.id?`<button type="button" class="link warn" data-sact="delete">${s.armed?"Tap again to delete":"Delete"}</button>`:`<button type="button" class="link" data-sact="cancel">Cancel</button>`}<button type="button" class="btn push" data-sact="save">Save</button></div>
   </div></div>`;
@@ -726,15 +892,38 @@ function saveSheet(){const s=sheet;const allowNeg=s.type==="adjustment";const am
   toast(isNew?savedMsg(e):`Updated ${e.name}.${learned?` Applied to ${learned} more.`:""}`,isNew?()=>removeEntry(id):()=>{const i=S.entries.findIndex(x=>x.id===id);if(i>=0)S.entries[i]=JSON.parse(before);persist();render()});
   if(ask&&aiReady())queueAI([e.id])}
 
+/* Category creation from a receipt or the review queue. */
+let categoryModal=null;
+function showCategoryModal(entryId=null){categoryModal={entryId,previous:document.activeElement,name:"",force:false};renderCategoryModal()}
+function closeCategoryModal(){const a=categoryModal?.previous;categoryModal=null;$("category-root").replaceChildren();
+  if(!sheet&&!$("install-root").firstElementChild)document.body.classList.remove("dialog-open");if(a?.isConnected)a.focus({preventScroll:true})}
+function renderCategoryModal(message=""){if(!categoryModal)return;const m=categoryModal,similar=relatedCategories(m.name);
+  $("category-root").innerHTML=`<div class="scrim" data-catmodal="backdrop"><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="category-title"><div class="eyebrow">CATEGORY</div><h3 id="category-title" style="margin-top:12px">New category</h3>
+    <label class="fld"><span>Category name</span><input id="new-category-name" class="in" value="${esc(m.name)}" maxlength="28" placeholder="e.g. Pet care" autocomplete="off"></label>
+    <p class="note${message?" warn":""}" role="status">${esc(message||"Choose a broad category you'll use more than once. Similar categories are checked locally.")}</p>
+    ${similar.length?`<p class="note">Related: ${similar.map(x=>esc(x)).join(", ")}</p>`:""}
+    <div class="acts"><button class="link" data-catmodal="cancel">Cancel</button><button class="btn push" data-catmodal="save">${m.force?"Add anyway":"Add category"}</button></div>
+  </section></div>`;
+  document.body.classList.add("dialog-open");$("new-category-name")?.focus({preventScroll:true})}
+function saveCategoryModal(){if(!categoryModal)return;const m=categoryModal,result=addCategory(m.name,m.force);
+  if(result.similar){m.force=true;renderCategoryModal(`Similar to ${result.similar.join(", ")}. Choose an existing category, or add anyway.`);return}
+  if(result.error){renderCategoryModal(result.error);return}
+  if(m.entryId){const e=find(m.entryId);if(e)setCategory(e,result.added)}
+  else if(sheet){sheet.category=result.added}
+  closeCategoryModal();persist();if(sheet)renderSheet();render();toast(`${result.added} added.`)}
+
 /* Backup */
 function backupJSON(){const{settings,...rest}=S;const{key,...safe}=settings;return JSON.stringify({app:"pocket-ledger",version:1,exported:new Date().toISOString(),...rest,settings:safe},null,1)}
 function importData(text){let p;try{p=JSON.parse(text)}catch{toast("That file isn't a Pocket Ledger backup.");return}
   if(!p||p.app!=="pocket-ledger"||p.version!==1||!Array.isArray(p.entries)||!Array.isArray(p.card||[])){
     toast("That file isn't a valid Pocket Ledger backup.");return}
-  const types=["purchase","unknown","adjustment","repayment"],statuses=["na","none","review","pending","auto","ai","approved"];
+  const types=["purchase","unknown","adjustment","repayment"],statuses=["na","none","review","proposal","pending","auto","ai","approved"];
+  const importedCategories=Array.isArray(p.customCategories)?p.customCategories:[];
+  if(importedCategories.length>32||!importedCategories.every(x=>typeof x==="string"&&x.length<=28&&x.length>=2)||new Set(importedCategories.map(categoryKey)).size!==importedCategories.length){toast("The backup has invalid custom categories.");return}
+  const validCategories=[...BASE_CATEGORIES,...importedCategories];
   const goodEntry=e=>e&&typeof e.id==="string"&&/^[a-zA-Z0-9_-]{1,80}$/.test(e.id)&&typeof e.name==="string"&&e.name.length<=80&&
     validDate(e.date)&&Number.isSafeInteger(e.amount)&&(e.type==="adjustment"?e.amount!==0:e.amount>0)&&types.includes(e.type)&&
-    (e.category==null||CATEGORIES.includes(e.category))&&statuses.includes(e.status)&&typeof e.created==="string"&&!Number.isNaN(Date.parse(e.created));
+    (e.category==null||validCategories.includes(e.category))&&statuses.includes(e.status)&&typeof e.created==="string"&&!Number.isNaN(Date.parse(e.created));
   const goodCard=c=>c&&validDate(c.date)&&Number.isSafeInteger(c.bal)&&c.bal>=0;
   if(!p.entries.every(goodEntry)||!(p.card||[]).every(goodCard)||new Set(p.entries.map(e=>e.id)).size!==p.entries.length){
     toast("Some records in this backup are invalid. Nothing was imported.");return}
@@ -744,16 +933,17 @@ function importData(text){let p;try{p=JSON.parse(text)}catch{toast("That file is
   if(p.recon?.log!==undefined&&(!Array.isArray(p.recon.log)||!p.recon.log.every(goodRecon))){
     toast("This backup has invalid reconciliation data. Nothing was imported.");return}
   const prev=JSON.stringify(S),d=defaults(),key=S.settings.key;
-  const dict=Object.fromEntries(Object.entries(p.dict||{}).filter(([k,v])=>typeof k==="string"&&k.length<=80&&CATEGORIES.includes(v)));
+  const dict=Object.fromEntries(Object.entries(p.dict||{}).filter(([k,v])=>typeof k==="string"&&k.length<=80&&validCategories.includes(v)));
   const opts=p.settings||{},ai=p.ai||{};
   const recon={last:validDate(p.recon?.last)?p.recon.last:null,log:p.recon?.log||[]};
   const safeAI={requests:Number.isSafeInteger(ai.requests)&&ai.requests>=0?ai.requests:0,
     cost:Number.isFinite(ai.cost)&&ai.cost>=0?ai.cost:0,lastError:typeof ai.lastError==="string"?ai.lastError.slice(0,400):""};
-  S={...d,entries:p.entries,dict,card:p.card||[],recon,ai:safeAI,
+  S={...d,entries:p.entries,dict,customCategories:importedCategories,aiResults:{},card:p.card||[],recon,ai:safeAI,
     settings:{...d.settings,budget:Number.isSafeInteger(opts.budget)&&opts.budget>=0?opts.budget:d.settings.budget,
       currency:safeCurrency(opts.currency),ai:opts.ai===true,model:typeof opts.model==="string"?opts.model.slice(0,150):"",
-      deny:opts.deny!==false,preferLocal:opts.preferLocal!==false,key},seeded:true};
-  persist();render();toast(`Imported ${S.entries.length} entries.`,()=>{S=JSON.parse(prev);persist();render()})}
+      deny:opts.deny!==false,preferLocal:opts.preferLocal!==false,suggestNew:opts.suggestNew!==false,
+      palette:COLOURWAYS[opts.palette]?opts.palette:"apricot",theme:THEME_MODES.includes(opts.theme)?opts.theme:"light",key},seeded:true};
+  applyAppearance();persist();render();toast(`Imported ${S.entries.length} entries.`,()=>{S=JSON.parse(prev);persist();render()})}
 
 /* Actions */
 const ACT={
@@ -765,6 +955,18 @@ const ACT={
     else if(p==="rec-past")openSheet(null,{date:recDraft.to});else openSheet(null)},
   filter:el=>{receiptFilter=el.dataset.f;render()},
   setcat:el=>{const e=find(el.dataset.id);if(!e)return;const n=setCategory(e,el.dataset.cat);persist();render();toast(`${e.name}: ${el.dataset.cat}.${n?` Applied to ${n} more.`:""}`)},
+  palette:el=>{S.settings.palette=el.dataset.v;applyAppearance();persist();render()},
+  theme:el=>{S.settings.theme=el.dataset.v;applyAppearance();persist();render()},
+  "add-category":()=>{const result=addCategory(categoryDraft,categoryConfirm===categoryDraft);
+    if(result.similar){categoryConfirm=categoryDraft;categoryFeedback=`Similar to ${result.similar.join(", ")}. Use the existing category, or add anyway.`;render();return}
+    if(result.error){categoryConfirm="";categoryFeedback=result.error;render();return}
+    categoryConfirm="";categoryFeedback="";categoryDraft="";render();toast(`${result.added} added.`)},
+  "cancel-category":()=>{categoryConfirm="";categoryFeedback="";render()},
+  "merge-category":el=>{const from=el.dataset.cat,to=mergeChoice[from];if(!to){toast("Choose the category to merge into.");return}
+    const prev=JSON.stringify(S);
+    if(mergeCategory(from,to)){delete mergeChoice[from];render();toast(`${from} merged into ${to}.`,()=>{S=JSON.parse(prev);persist();render()})}} ,
+  "accept-proposal":el=>{const e=find(el.dataset.id);if(!e||!e.suggestedCategory)return;
+    showCategoryModal(e.id);categoryModal.name=e.suggestedCategory;renderCategoryModal()},
   "ai-confirm-all":()=>{const l=S.entries.filter(e=>e.type==="purchase"&&e.status==="ai");l.forEach(e=>setCategory(e,e.category));persist();render();toast(`Kept ${l.length}.`)},
   "ai-all":()=>queueAI(S.entries.filter(e=>e.type==="purchase"&&e.status==="none").map(e=>e.id)),
   "rec-adjust":()=>{const logged=spendIn(recDraft.from,recDraft.to),stmt=parseMoney(recDraft.stmt,false,true);if(stmt==null)return;const diff=stmt-logged;if(!diff)return;
@@ -795,12 +997,11 @@ const ACT={
     catch(err){testMsg=err.message;if(err.status===403)S.settings.model=""}
     persist();render()},
   "reset-usage":()=>{S.ai.requests=0;S.ai.cost=0;persist();render()},
-  forget:el=>{delete S.dict[el.dataset.k];persist();render()},
-  "copy-backup":async()=>{const txt=backupJSON();try{await navigator.clipboard.writeText(txt);backupText="";render();toast("Backup copied.")}catch{backupText=txt;render();$("p-backup")?.select()}},
+  forget:el=>{delete S.dict[el.dataset.k];persist();render()},  "copy-backup":async()=>{const txt=backupJSON();try{await navigator.clipboard.writeText(txt);backupText="";render();toast("Backup copied.")}catch{backupText=txt;render();$("p-backup")?.select()}},
   "download-backup":()=>{if(framed){toast("Downloads are blocked in the preview. Use Copy backup.");return}
     try{const url=URL.createObjectURL(new Blob([backupJSON()],{type:"application/json"}));const a=document.createElement("a");a.href=url;a.download=`pocket-ledger-${today()}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)}catch{}},
   erase:()=>{if(!armed.erase){armed.erase=true;render();setTimeout(()=>{armed.erase=false;render()},4000);return}
-    armed.erase=false;const prev=JSON.stringify(S);S=defaults();S.seeded=true;persist();render();toast("Everything erased.",()=>{S=JSON.parse(prev);persist();render()})}
+    armed.erase=false;const prev=JSON.stringify(S);S=defaults();S.seeded=true;applyAppearance();persist();render();toast("Everything erased.",()=>{S=JSON.parse(prev);applyAppearance();persist();render()})}
 };
 
 $("main").addEventListener("click",e=>{const el=e.target.closest("[data-act]");if(!el)return;e.preventDefault();ACT[el.dataset.act]?.(el)});
@@ -826,6 +1027,8 @@ $("sheet-root").addEventListener("click",e=>{
   if(e.target.classList.contains("scrim")){closeSheet();return}
   const el=e.target.closest("[data-sact]");if(!el)return;const a=el.dataset.sact;
   if(a==="type"){sheet.type=el.dataset.v;sheet.err="";renderSheet()}
+  else if(a==="recent"){sheet.name=el.dataset.label;renderSheet();$("s-amt")?.focus()}
+  else if(a==="custom-category")showCategoryModal();
   else if(a==="cancel")closeSheet();
   else if(a==="save")saveSheet();
   else if(a==="delete"){if(!sheet.armed){sheet.armed=true;renderSheet();return}const e0=find(sheet.id);const snap=JSON.stringify(e0);removeEntry(sheet.id);closeSheet();
@@ -833,12 +1036,28 @@ $("sheet-root").addEventListener("click",e=>{
 $("sheet-root").addEventListener("input",e=>{const k=e.target.dataset.s;if(k&&sheet){sheet[k]=e.target.value;sheet.err=""}});
 $("sheet-root").addEventListener("change",e=>{const k=e.target.dataset.s;if(k&&sheet)sheet[k]=e.target.value});
 $("sheet-root").addEventListener("keydown",e=>{
+  if(categoryModal)return;
   if(e.key==="Tab"&&sheet){const f=[...$("sheet-root").querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled])')].filter(x=>x.getClientRects().length);
     if(!f.length)return;const first=f[0],last=f[f.length-1];
     if(e.shiftKey&&(document.activeElement===first||!$("sheet-root").contains(document.activeElement))){e.preventDefault();last.focus()}
     else if(!e.shiftKey&&(document.activeElement===last||!$("sheet-root").contains(document.activeElement))){e.preventDefault();first.focus()}}
   if(e.key==="Enter"&&e.target.tagName==="INPUT"&&!e.isComposing){e.preventDefault();saveSheet()}});
-document.addEventListener("keydown",e=>{if(e.key==="Escape"&&sheet)closeSheet()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&sheet&&!categoryModal)closeSheet()});
+document.getElementById("new-tab").addEventListener("click",()=>openSheet(null));
+$("main").addEventListener("change",e=>{if(e.target.dataset.reviewCat){const entry=find(e.target.dataset.reviewCat),cat=e.target.value;
+  if(!entry||!categories().includes(cat))return;const n=setCategory(entry,cat);persist();render();toast(`${entry.name}: ${cat}.${n?` Applied to ${n} more.`:""}`)}
+  if(e.target.dataset.merge!==undefined)mergeChoice[e.target.dataset.merge]=e.target.value});
+$("main").addEventListener("input",e=>{if(e.target.dataset.categoryInput){categoryDraft=e.target.value;categoryConfirm="";categoryFeedback=""}});
+$("category-root").addEventListener("input",e=>{if(e.target.id==="new-category-name"&&categoryModal){categoryModal.name=e.target.value;categoryModal.force=false}});
+$("category-root").addEventListener("click",e=>{const b=e.target.closest("[data-catmodal]");if(!b)return;
+  const a=b.dataset.catmodal;if(a==="backdrop"&&e.target!==b)return;
+  if(a==="cancel"||a==="backdrop")closeCategoryModal();else if(a==="save")saveCategoryModal()});
+$("category-root").addEventListener("keydown",e=>{if(!categoryModal)return;
+  if(e.key==="Escape"){closeCategoryModal();return}if(e.key==="Enter"&&e.target.id==="new-category-name"){e.preventDefault();saveCategoryModal()}
+  if(e.key==="Tab"){const a=[...$("category-root").querySelectorAll('input:not([disabled]),button:not([disabled])')];
+    if(e.shiftKey&&document.activeElement===a[0]){e.preventDefault();a.at(-1).focus()}
+    else if(!e.shiftKey&&document.activeElement===a.at(-1)){e.preventDefault();a[0].focus()}}});
+window.matchMedia("(prefers-color-scheme: dark)")?.addEventListener?.("change",()=>{if(S.settings.theme==="system")applyAppearance()});
 window.addEventListener("hashchange",route);
 
 load();
