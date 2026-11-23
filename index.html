@@ -363,8 +363,7 @@ html,body{transition:background-color .24s ease,color .24s ease}
 .hero{margin-top:21px;padding-top:0}
 .hero-title{margin-top:0}
 h2{margin-top:24px}
-.overview-eyebrow{margin-top:24px}
-.overview-heading{margin-top:10px}
+.overview-heading{margin-top:26px}
 .cycle-range{margin-top:9px;font-size:14px;color:var(--muted)}
 .cycle-preview{display:flex;flex-direction:column;gap:2px;margin-top:19px;padding:15px 16px;border-radius:16px;background:var(--accent-soft);border:1px solid var(--accent-outline)}
 .cycle-preview>span{font-size:12px;color:var(--accent-ink)}
@@ -813,7 +812,6 @@ function viewOverview(){const t=today(),m=monthStats(),pct=m.budget?Math.min(100
     <div class="line"><span>Logged spending since</span><span class="v">${money(buy)}</span></div>
     <div class="line"><span>Illustrative balance<small>Assumes all logged purchases used this card</small></span><span class="v">${money(latest.bal+buy-rep)}</span></div></div>`}
   return `${masthead()}
-  <div class="eyebrow overview-eyebrow">FINANCIAL MONTH</div>
   <h2 class="overview-heading">${m.calendarName}</h2>
   <p class="sub cycle-range">${esc(m.name)}</p>
   ${fig(m.spent)}
