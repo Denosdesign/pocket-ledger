@@ -362,6 +362,15 @@ html,body{transition:background-color .24s ease,color .24s ease}
 .utility-settings:hover,.utility-settings[aria-current="page"]{background:var(--accent-soft);border-color:var(--accent-outline);color:var(--accent-ink)}
 .hero{margin-top:21px;padding-top:0}
 .hero-title{margin-top:0}
+.hero-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.hero-heading .hero-title{min-width:0;flex:1}
+.metric-toggle{display:grid;place-items:center;flex:none;width:40px;height:40px;margin-top:1px;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--surface);color:var(--muted);box-shadow:0 2px 7px var(--shadow);transition:background-color .18s ease,color .18s ease,transform .18s ease}
+.metric-toggle svg{width:19px;height:19px;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.metric-toggle:hover{background:var(--soft);color:var(--ink)}
+.metric-toggle:active{transform:scale(.93)}
+.metric-value{animation:metricReveal .25s cubic-bezier(.18,.85,.2,1) both}
+@keyframes metricReveal{from{opacity:.55;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.metric-value{animation:none}.metric-toggle{transition:none}}
 h2{margin-top:24px}
 .overview-heading{margin-top:26px}
 .cycle-range{margin-top:9px;font-size:14px;color:var(--muted)}
@@ -694,7 +703,7 @@ async function runAI(id){
   finally{aiPending.delete(id);persist();render()}}
 
 /* UI state */
-let view="today",draft={name:"",amt:"",date:today(),unknown:false},capErr="",receiptFilter="all";
+let view="today",homeMetric="month",draft={name:"",amt:"",date:today(),unknown:false},capErr="",receiptFilter="all";
 let recDraft=null,cardDraft={bal:"",date:today()},models=null,modelQuery="",modelMsg="",testMsg="",showKey=false,backupText="",armed={};
 let sheet=null,sheetReturnFocus=null,toastTimer=null,categoryDraft="",categoryConfirm="",categoryFeedback="",mergeChoice={};
 
@@ -722,10 +731,15 @@ function recentLabels(){const since=addDays(today(),-60),m=new Map();
   return [...m.values()].sort((a,b)=>b.n-a.n).slice(0,5)}
 
 function viewToday(){const t=today(),tot=spendIn(t,t),m=monthStats(),todays=S.entries.filter(e=>e.date===t).sort(byNewest),rec=recentLabels();
+  const cumulative=homeMetric==="month",metricTitle=cumulative?"Cumulative spending":"Today’s spending";
+  const nextTitle=cumulative?"Show today’s spending":"Show cumulative spending";
   return `${masthead()}
-  <section class="hero" aria-label="Today’s spending">
-    <h1 class="hero-title">Today’s spending</h1>
-    ${fig(tot)}
+  <section class="hero" aria-label="${metricTitle}">
+    <div class="hero-heading"><h1 class="hero-title">${metricTitle}</h1>
+      <button type="button" id="spending-toggle" class="metric-toggle" data-act="toggle-spending" aria-label="${nextTitle}" title="${nextTitle}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h15l-3-3m3 3-3 3M20 17H5l3-3m-3 3 3 3"/></svg>
+      </button></div>
+    <div class="metric-value" aria-live="polite">${fig(cumulative?m.spent:tot)}</div>
     <div class="hero-footer"><span class="budget-remain">${m.left>=0?`${money(m.left)} remaining`:`${money(-m.left)} over budget`}</span><span class="budget-context" title="${esc(m.name)}">${esc(m.name)}</span></div>
     <div class="meter${m.left<0?" over":""}"><i style="width:${m.budget?Math.min(100,m.spent/m.budget*100):0}%"></i></div>
   </section>
@@ -1033,6 +1047,7 @@ function importData(text){let p;try{p=JSON.parse(text)}catch{toast("That file is
 
 /* Actions */
 const ACT={
+  "toggle-spending":()=>{homeMetric=homeMetric==="month"?"today":"month";render()},
   "toggle-unknown":()=>{draft.unknown=!draft.unknown;capErr="";render();(draft.unknown?$("cap-amt"):$("cap-name"))?.focus()},
   pick:el=>{draft.name=el.dataset.label;draft.unknown=false;render();$("cap-amt")?.focus()},
   edit:el=>openSheet(el.dataset.id),
