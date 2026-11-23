@@ -997,7 +997,8 @@ const ACT={
     catch(err){testMsg=err.message;if(err.status===403)S.settings.model=""}
     persist();render()},
   "reset-usage":()=>{S.ai.requests=0;S.ai.cost=0;persist();render()},
-  forget:el=>{delete S.dict[el.dataset.k];persist();render()},  "copy-backup":async()=>{const txt=backupJSON();try{await navigator.clipboard.writeText(txt);backupText="";render();toast("Backup copied.")}catch{backupText=txt;render();$("p-backup")?.select()}},
+  forget:el=>{delete S.dict[el.dataset.k];persist();render()},
+  "copy-backup":async()=>{const txt=backupJSON();try{await navigator.clipboard.writeText(txt);backupText="";render();toast("Backup copied.")}catch{backupText=txt;render();$("p-backup")?.select()}},
   "download-backup":()=>{if(framed){toast("Downloads are blocked in the preview. Use Copy backup.");return}
     try{const url=URL.createObjectURL(new Blob([backupJSON()],{type:"application/json"}));const a=document.createElement("a");a.href=url;a.download=`pocket-ledger-${today()}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)}catch{}},
   erase:()=>{if(!armed.erase){armed.erase=true;render();setTimeout(()=>{armed.erase=false;render()},4000);return}
