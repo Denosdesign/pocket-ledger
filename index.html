@@ -301,9 +301,9 @@ h2{margin-top:42px;font-size:clamp(40px,10vw,48px)}
       ${!safari?'<p class="note">Open this website in Safari first, then follow these steps.</p>':''}
       <ol class="install-steps"><li>Open Pocket Ledger in <strong>Safari</strong>.</li>
       <li>Tap ${shareIcon} <strong>Share</strong> in the Safari toolbar.<small>If Share is not visible, open the page menu first.</small></li>
-      <li>Choose <strong>Add to Home Screen</strong>.<small>You may need to scroll through the list of actions.</small></li>
+      <li>Choose <strong>Add to Home Screen</strong>.<small>You may need to scroll through the actions. Keep “Open as Web App” on if shown.</small></li>
       <li>Tap <strong>Add</strong> to confirm.</li></ol>
-      <p class="note">Ledger will open without the Safari toolbar. Your existing entries remain stored in Safari on this device. Use Settings to back them up.</p>
+      <p class="note">Ledger opens without the Safari toolbar. Home Screen apps keep separate local storage from Safari, so existing entries do not transfer automatically. Download a backup in Safari Settings first, then import it from the installed app.</p>
       <div class="acts" style="margin-top:23px"><button type="button" class="btn push" data-install="close">Got it</button></div>
       </section></div>`;
     document.body.classList.add('dialog-open');host.querySelector('[data-install="close"]')?.focus({preventScroll:true});}
