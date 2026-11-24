@@ -523,11 +523,11 @@ function dayLabel(s){const t=today();if(s===t)return"Today";if(s===addDays(t,-1)
 function isoWeek(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const day=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-day);const y=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil(((t-y)/864e5+1)/7)}
 const framed=(()=>{try{return window.self!==window.top}catch{return true}})();
 
-function defaults(){return{entries:[],dict:{},card:[],recon:{last:null,log:[]},ai:{requests:0,cost:0,lastError:""},
+function defaults(){return{entries:[],dict:{},ai:{requests:0,cost:0,lastError:""},
   customCategories:[],aiResults:{},settings:{budget:600000,currency:"HK$",ai:false,key:"",model:"",deny:true,preferLocal:true,suggestNew:true,palette:"apricot",theme:"light",cycleStart:1},seeded:false}}
 let S=defaults(),storageOK=true;
 function load(){
-  try{const raw=localStorage.getItem(STORE_KEY);if(raw){const p=JSON.parse(raw);const d=defaults();S={...d,...p,settings:{...d.settings,...p.settings},recon:{...d.recon,...p.recon},ai:{...d.ai,...p.ai}}}}
+  try{const raw=localStorage.getItem(STORE_KEY);if(raw){const p=JSON.parse(raw);const d=defaults();S={...d,...p,settings:{...d.settings,...p.settings},ai:{...d.ai,...p.ai}}}}
   catch{storageOK=false}
   S.settings.currency=safeCurrency(S.settings.currency);
   S.settings.palette=COLOURWAYS[S.settings.palette]?S.settings.palette:"apricot";
@@ -553,11 +553,6 @@ const validDate=s=>typeof s==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&ymd(toDat
 const find=id=>S.entries.find(e=>e.id===id);
 const spendIn=(from,to)=>S.entries.reduce((a,e)=>SPEND.has(e.type)&&e.date>=from&&e.date<=to?a+e.amount:a,0);
 const byNewest=(a,b)=>b.date.localeCompare(a.date)||b.created.localeCompare(a.created);
-function rangeSnapshot(from,to){return JSON.stringify(S.entries.filter(e=>SPEND.has(e.type)&&e.date>=from&&e.date<=to)
-  .map(e=>[e.id,e.type,e.date,e.amount]).sort((a,b)=>a[0].localeCompare(b[0])))}
-function verifiedReconciliations(){return (S.recon.log||[]).filter(r=>r&&validDate(r.from)&&validDate(r.to)&&r.from<=r.to&&
-  (typeof r.snapshot==="string"?r.snapshot===rangeSnapshot(r.from,r.to):spendIn(r.from,r.to)===r.logged))}
-const isProvisional=(d,verified=verifiedReconciliations())=>!verified.some(r=>r.from<=d&&r.to>=d);
 const needsReview=e=>e.type==="purchase"&&["none","review","proposal"].includes(e.status);
 const needsAttention=e=>needsReview(e)||(e.type==="purchase"&&e.status==="ai");
 const aiReady=()=>S.settings.ai&&S.settings.key&&S.settings.model;
@@ -704,7 +699,7 @@ async function runAI(id){
 
 /* UI state */
 let view="today",homeMetric="month",draft={name:"",amt:"",date:today(),unknown:false},capErr="",receiptFilter="all";
-let recDraft=null,cardDraft={bal:"",date:today()},models=null,modelQuery="",modelMsg="",testMsg="",showKey=false,backupText="",armed={};
+let models=null,modelQuery="",modelMsg="",testMsg="",showKey=false,backupText="",armed={};
 let sheet=null,sheetReturnFocus=null,toastTimer=null,categoryDraft="",categoryConfirm="",categoryFeedback="",mergeChoice={};
 
 const cur=()=>esc(S.settings.currency);
@@ -715,7 +710,7 @@ const masthead=()=>`<header class="utility-header">
   <span class="utility-date"><span class="utility-dot" aria-hidden="true"></span>${esc(WD_LONG[toDate(today()).getDay()])} <span class="utility-divider">·</span> ${esc(shortDate(today()))}</span>
   <a class="utility-settings" href="#prefs" aria-label="Settings" title="Settings"${view==="prefs"?' aria-current="page"':''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7h3m5 0h9M3.5 17h9m5 0h3"/><circle cx="9" cy="7" r="2.5"/><circle cx="15" cy="17" r="2.5"/></svg></a>
 </header>`;
-const hasExamples=()=>S.entries.some(e=>e.example)||S.card.some(c=>c.example);
+const hasExamples=()=>S.entries.some(e=>e.example);
 function foot(){const p=[];
   if(!storageOK)p.push(`<span style="color:var(--warn)">This browser isn't saving. Copy a backup in Settings before closing.</span>`);
   if(hasExamples())p.push(`Showing example entries. <button class="link" data-act="clear-examples">Clear them</button>`);
@@ -768,25 +763,9 @@ function viewReceipt(){const t=today();
   :`<p class="empty" style="margin-top:24px">Nothing here.</p>`}
   ${foot()}`}
 
-function reconcileFeedback(logged,stmt){
-  if(stmt===null)return `<p class="note">Enter the statement purchase total to compare it with your log.</p>`;
-  const diff=stmt-logged;
-  if(diff===0)return `<p class="note">Matches the statement. Ready to reconcile.</p>`;
-  return `<p class="note warn">${diff>0?`${money(diff)} missing from your log.`:`${money(-diff)} more in your log than on the statement.`}</p>
-    <div class="acts" style="margin-top:4px">${diff>0?`<button class="link ink" data-act="new" data-preset="rec-past">Add missing entry</button>`:`<button class="link ink" data-act="rec-filter">Check entries</button>`}<button class="link ink" data-act="rec-adjust">Add ${money(diff,{sign:true})} adjustment</button></div>`}
-function refreshReconcile(){if(!recDraft||!$("rec-feedback"))return;
-  const logged=spendIn(recDraft.from,recDraft.to),stmt=parseMoney(recDraft.stmt,false,true);
-  $("rec-feedback").innerHTML=reconcileFeedback(logged,stmt);
-  $("rec-mark").disabled=stmt===null||stmt!==logged}
-function viewReview(){const t=today();
-  const pend=S.entries.filter(needsReview).sort(byNewest),aiList=S.entries.filter(e=>e.type==="purchase"&&e.status==="ai").sort(byNewest);
-  const verified=verifiedReconciliations(),latest=verified.map(r=>r.to).sort().at(-1)||null;
-  if(!recDraft)recDraft={from:latest&&latest<t?addDays(latest,1):addDays(t,-6),to:t,stmt:""};
-  if(recDraft.from>recDraft.to)recDraft.from=recDraft.to;
-  const logged=spendIn(recDraft.from,recDraft.to),stmt=parseMoney(recDraft.stmt,false,true);
+function viewReview(){const pend=S.entries.filter(needsReview).sort(byNewest),aiList=S.entries.filter(e=>e.type==="purchase"&&e.status==="ai").sort(byNewest);
   const opts=e=>`<div class="review-chooser"><label class="sr" for="cat-${e.id}">Category for ${esc(e.name)}</label><select class="in sm" id="cat-${e.id}" data-review-cat="${e.id}"><option value="">Choose category</option>${categories().map(c=>`<option value="${esc(c)}" ${e.category===c?"selected":""}>${esc(c)}</option>`).join("")}</select></div>${e.status==="proposal"&&e.suggestedCategory?`<div class="category-proposal"><span>Suggested: <strong>${esc(e.suggestedCategory)}</strong></span><button class="link ink" type="button" data-act="accept-proposal" data-id="${e.id}">Review &amp; add</button></div>`:""}`;
   const noneCount=pend.filter(e=>e.status==="none").length;
-  const diffHTML=reconcileFeedback(logged,stmt);
   return `${masthead()}
   <h2>Review</h2><p class="sub">Optional. Nothing here blocks logging.</p>
   <section class="sec"><h3><span>Categories</span>${aiReady()&&noneCount?`<button class="link ink" data-act="ai-all">Ask AI</button>`:`<span>${pend.length||""}</span>`}</h3>
@@ -795,19 +774,9 @@ function viewReview(){const t=today();
   </section>
   ${aiList.length?`<section class="sec"><h3><span>AI suggestions</span><button class="link ink" data-act="ai-confirm-all">Keep all</button></h3>
     ${aiList.map(e=>`<div class="item"><div class="line"><span>${esc(e.name)}</span><span class="v">${esc(e.category)}</span></div>${opts(e)}</div>`).join("")}</section>`:""}
-  <section class="sec"><h3><span>Reconcile with card</span><span>${latest?`Verified to ${shortDate(latest)}`:S.recon.log?.length?"Needs checking":"Not yet"}</span></h3>
-    <div class="two">
-      <label class="fld"><span>From</span><input class="in sm" type="date" id="rec-from" data-rec="from" value="${recDraft.from}" max="${t}"></label>
-      <label class="fld"><span>To</span><input class="in sm" type="date" id="rec-to" data-rec="to" value="${recDraft.to}" max="${t}"></label>
-    </div>
-    <div class="line"><span>Logged</span><span class="v">${money(logged)}</span></div>
-    <label class="fld amt"><span>Statement purchases, excluding repayments</span><input class="in sm" id="rec-stmt" data-rec="stmt" value="${esc(recDraft.stmt)}" inputmode="decimal" placeholder="0"><span class="sm" aria-hidden="true">${cur()}</span></label>
-    <div id="rec-feedback" role="status" aria-live="polite">${diffHTML}</div>
-    <div class="acts"><button class="btn" id="rec-mark" data-act="rec-mark" ${stmt===null||stmt!==logged?"disabled":""}>Mark reconciled to ${esc(shortDate(recDraft.to))}</button></div>
-  </section>
   ${foot()}`}
 
-function viewOverview(){const t=today(),m=monthStats(),pct=m.budget?Math.min(100,m.spent/m.budget*100):0;
+function viewOverview(){const m=monthStats(),pct=m.budget?Math.min(100,m.spent/m.budget*100):0;
   const ms=S.entries.filter(e=>e.date>=m.first&&e.date<=m.last),g=new Map();
   for(const e of ms){if(e.type!=="purchase")continue;const k=e.category||"Uncategorised";g.set(k,(g.get(k)||0)+e.amount)}
   const unk=ms.filter(e=>e.type==="unknown").reduce((a,e)=>a+e.amount,0),adj=ms.filter(e=>e.type==="adjustment").reduce((a,e)=>a+e.amount,0);
@@ -815,34 +784,16 @@ function viewOverview(){const t=today(),m=monthStats(),pct=m.budget?Math.min(100
   if(g.get("Uncategorised"))flags.push(["Uncategorised",g.get("Uncategorised")]);if(unk)flags.push(["Name unknown",unk]);if(adj)flags.push(["Adjustments",adj]);
   const max=Math.max(1,...cats.map(c=>c[1]),...flags.map(f=>Math.abs(f[1])));
   const cat=([k,v],flag)=>`<div class="cat${flag?" flag":""}"><div class="line"><span>${esc(k)}</span><span class="v">${money(v)}</span></div><div class="bar"><i style="width:${Math.max(1,Math.abs(v)/max*100)}%"></i></div></div>`;
-  const verified=verifiedReconciliations();
-  const unverified=S.entries.filter(e=>SPEND.has(e.type)&&isProvisional(e.date,verified)&&e.date>=m.first&&e.date<=m.last);
-  const prov=unverified.reduce((a,e)=>a+e.amount,0);
-  const cards=[...S.card].sort((a,b)=>a.date.localeCompare(b.date)),latest=cards[cards.length-1],prev=cards[cards.length-2];
-  let card=`<p class="empty">Add the balance from your latest statement.</p>`;
-  if(latest){const since=S.entries.filter(e=>e.date>latest.date),rep=since.filter(e=>e.type==="repayment").reduce((a,e)=>a+e.amount,0),buy=since.filter(e=>SPEND.has(e.type)).reduce((a,e)=>a+e.amount,0),delta=prev?latest.bal-prev.bal:null;
-    card=`${fig(latest.bal,"md")}<p class="sub">Statement balance, ${shortDate(latest.date)}${delta!=null?` · ${delta<=0?"down":"up"} ${money(Math.abs(delta))} since ${shortDate(prev.date)}`:""}</p>
-    <div style="margin-top:16px"><div class="line"><span>Repaid since</span><span class="v">${money(rep)}</span></div>
-    <div class="line"><span>Logged spending since</span><span class="v">${money(buy)}</span></div>
-    <div class="line"><span>Illustrative balance<small>Assumes all logged purchases used this card</small></span><span class="v">${money(latest.bal+buy-rep)}</span></div></div>`}
   return `${masthead()}
   <h2 class="overview-heading">${m.calendarName}</h2>
   <p class="sub cycle-range">${esc(m.name)}</p>
   ${fig(m.spent)}
   <p class="sub">of ${money(m.budget)} · ${m.left>=0?`${money(m.left)} left, about ${money(Math.floor(m.left/m.daysLeft))} a day`:`${money(-m.left)} over`}</p>
   <div class="meter${m.left<0?" over":""}"><i style="width:${pct}%"></i></div>
-  <p class="note">${!ms.some(e=>SPEND.has(e.type))?"No spending recorded this financial month.":unverified.length?`${money(prov)} across ${unverified.length} unreconciled ${unverified.length===1?"entry":"entries"}.`:"All recorded spending reconciled."}</p>
+  <p class="note">${ms.filter(e=>SPEND.has(e.type)).length} recorded ${ms.filter(e=>SPEND.has(e.type)).length===1?"expense":"expenses"} this financial month.</p>
   <section class="sec"><h3><span>By category</span></h3>
     ${cats.length||flags.length?cats.map(c=>cat(c,false)).join("")+flags.map(f=>cat(f,true)).join("")
     +(flags.length?`<p class="note">Grey rows count toward the total but stay out of categories.</p>`:""):`<p class="empty">No spending this financial month.</p>`}
-  </section>
-  <section class="sec"><h3><span>Credit card</span></h3>
-    ${card}
-    <div class="two">
-      <label class="fld amt"><span>New statement balance</span><input class="in sm" id="card-bal" data-card="bal" value="${esc(cardDraft.bal)}" inputmode="decimal" placeholder="0"><span class="sm" aria-hidden="true">${cur()}</span></label>
-      <label class="fld"><span>As of</span><input class="in sm" type="date" id="card-date" data-card="date" value="${cardDraft.date}" max="${t}"></label>
-    </div>
-    <div class="acts"><button class="link ink" data-act="card-save">Save balance</button><button class="link" data-act="new" data-preset="repayment">Log a repayment</button></div>
   </section>
   ${foot()}`}
 
@@ -956,14 +907,15 @@ function openSheet(id,preset={}){const e=id?find(id):null;
 function closeSheet(){sheet=null;$("sheet-root").innerHTML="";document.body.classList.remove("dialog-open");
   if(sheetReturnFocus?.isConnected)sheetReturnFocus.focus({preventScroll:true});sheetReturnFocus=null}
 function renderSheet(){if(!sheet){closeSheet();return}const s=sheet,t=today();
-  const types=[["purchase","Purchase"],["unknown","No name"],["adjustment","Adjustment"],["repayment","Repayment"]];
-  const hint={purchase:"",unknown:"Counts as spending, kept out of categories.",adjustment:"A correction from reconciling. Use a minus sign to reduce spending.",repayment:"Paid to your card. Lowers debt, not counted as spending."}[s.type];
+  const types=[["purchase","Purchase"],["unknown","No name"]];
+  if(s.id&&["adjustment","repayment"].includes(s.type))types.push([s.type,s.type==="adjustment"?"Adjustment":"Repayment"]);
+  const hint={purchase:"",unknown:"Counts as spending, kept out of categories.",adjustment:"Historical correction. Use a minus sign to reduce spending.",repayment:"Historical repayment record. Not counted as spending."}[s.type];
   const a=document.activeElement,fid=a&&a.id&&$("sheet-root").contains(a)?a.id:null;
   $("sheet-root").innerHTML=`<div class="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="s-title">
     <h3 id="s-title">${s.id?"Edit":"New entry"}</h3>
     <div class="types" role="group" aria-label="Type">${types.map(([k,l])=>`<button type="button" data-sact="type" data-v="${k}" aria-pressed="${s.type===k}">${l}</button>`).join("")}</div>
     ${hint?`<p class="note">${hint}</p>`:""}
-    <label class="fld"><span>Name</span><input class="in" id="s-name" data-s="name" value="${esc(s.name)}" placeholder="${s.type==="unknown"?"???":s.type==="repayment"?"Card repayment":s.type==="adjustment"?"Adjustment":"Lunch"}" maxlength="40" autocapitalize="words"></label>
+    <label class="fld"><span>Name</span><input class="in" id="s-name" data-s="name" value="${esc(s.name)}" placeholder="${s.type==="unknown"?"???":s.type==="repayment"?"Repayment":s.type==="adjustment"?"Adjustment":"Lunch"}" maxlength="40" autocapitalize="words"></label>
     ${!s.id&&s.type==="purchase"&&recentLabels().length?`<div class="recent">${recentLabels().slice(0,4).map(r=>`<button type="button" data-sact="recent" data-label="${esc(r.label)}">${esc(r.label)}</button>`).join("")}</div>`:""}
     <div class="two">
       <label class="fld amt"><span>Amount</span><input class="in" id="s-amt" data-s="amt" value="${esc(s.amt)}" inputmode="${s.type==="adjustment"?"text":"decimal"}" placeholder="0"><span aria-hidden="true">${cur()}</span></label>
@@ -975,7 +927,7 @@ function renderSheet(){if(!sheet){closeSheet();return}const s=sheet,t=today();
   </div></div>`;
   if(fid)$(fid)?.focus({preventScroll:true})}
 function saveSheet(){const s=sheet;const allowNeg=s.type==="adjustment";const amount=parseMoney(s.amt,allowNeg);let name=s.name.trim();
-  if(!name){if(s.type==="unknown")name="???";else if(s.type==="repayment")name="Card repayment";else if(s.type==="adjustment")name="Adjustment";else{s.err="Add a short name.";renderSheet();return}}
+  if(!name){if(s.type==="unknown")name="???";else if(s.type==="repayment")name="Repayment";else if(s.type==="adjustment")name="Adjustment";else{s.err="Add a short name.";renderSheet();return}}
   if(amount==null){s.err=allowNeg?"Enter an amount. Use a minus sign to reduce spending.":"Enter an amount above zero.";renderSheet();return}
   let e=s.id?find(s.id):null;const isNew=!e,before=e?JSON.stringify(e):null;
   if(isNew){e={id:uid(),created:new Date().toISOString(),category:null,status:"none"};S.entries.push(e)}
@@ -1051,9 +1003,7 @@ const ACT={
   "toggle-unknown":()=>{draft.unknown=!draft.unknown;capErr="";render();(draft.unknown?$("cap-amt"):$("cap-name"))?.focus()},
   pick:el=>{draft.name=el.dataset.label;draft.unknown=false;render();$("cap-amt")?.focus()},
   edit:el=>openSheet(el.dataset.id),
-  new:el=>{const p=el.dataset.preset,t=today();
-    if(p==="past")openSheet(null,{date:addDays(t,-1)});else if(p==="repayment")openSheet(null,{type:"repayment"});
-    else if(p==="rec-past")openSheet(null,{date:recDraft.to});else openSheet(null)},
+  new:el=>{if(el.dataset.preset==="past")openSheet(null,{date:addDays(today(),-1)});else openSheet(null)},
   filter:el=>{receiptFilter=el.dataset.f;render()},
   setcat:el=>{const e=find(el.dataset.id);if(!e)return;const n=setCategory(e,el.dataset.cat);persist();render();toast(`${e.name}: ${el.dataset.cat}.${n?` Applied to ${n} more.`:""}`)},
   palette:el=>{S.settings.palette=el.dataset.v;applyAppearance();persist();render()},
@@ -1070,20 +1020,7 @@ const ACT={
     showCategoryModal(e.id);categoryModal.name=e.suggestedCategory;renderCategoryModal()},
   "ai-confirm-all":()=>{const l=S.entries.filter(e=>e.type==="purchase"&&e.status==="ai");l.forEach(e=>setCategory(e,e.category));persist();render();toast(`Kept ${l.length}.`)},
   "ai-all":()=>queueAI(S.entries.filter(e=>e.type==="purchase"&&e.status==="none").map(e=>e.id)),
-  "rec-adjust":()=>{const logged=spendIn(recDraft.from,recDraft.to),stmt=parseMoney(recDraft.stmt,false,true);if(stmt==null)return;const diff=stmt-logged;if(!diff)return;
-    const e={id:uid(),name:`Reconcile ${shortDate(recDraft.from)} to ${shortDate(recDraft.to)}`,amount:diff,date:recDraft.to,created:new Date().toISOString(),type:"adjustment",category:null,status:"na"};
-    S.entries.push(e);persist();render();toast(`Added ${money(diff,{sign:true})} adjustment.`,()=>removeEntry(e.id))},
-  "rec-filter":()=>{receiptFilter="all";location.hash="#receipt"},
-  "rec-mark":()=>{const logged=spendIn(recDraft.from,recDraft.to),stmt=parseMoney(recDraft.stmt,false,true);
-    if(stmt===null){toast("Enter the statement purchases first.");$("rec-stmt")?.focus();return}
-    if(stmt!==logged){toast("Resolve the difference before marking this period reconciled.");return}
-    const adj=S.entries.filter(e=>e.type==="adjustment"&&e.date>=recDraft.from&&e.date<=recDraft.to).reduce((a,e)=>a+e.amount,0);
-    const prev=JSON.stringify(S.recon);S.recon.last=!S.recon.last||recDraft.to>S.recon.last?recDraft.to:S.recon.last;
-    S.recon.log.push({from:recDraft.from,to:recDraft.to,logged,statement:stmt,adj,snapshot:rangeSnapshot(recDraft.from,recDraft.to),at:new Date().toISOString()});
-    const to=recDraft.to;recDraft=null;persist();render();toast(`Reconciled to ${shortDate(to)}.`,()=>{S.recon=JSON.parse(prev);persist();render()})},
-  "card-save":()=>{const bal=parseMoney(cardDraft.bal,false,true);if(bal==null){toast("Enter a valid statement balance, including zero.");$("card-bal")?.focus();return}
-    S.card=S.card.filter(c=>c.date!==cardDraft.date);S.card.push({date:cardDraft.date,bal});cardDraft={bal:"",date:today()};persist();render();toast("Balance saved.")},
-  "clear-examples":()=>{const prev=JSON.stringify(S);S.entries=S.entries.filter(e=>!e.example);S.card=S.card.filter(c=>!c.example);persist();render();toast("Examples cleared.",()=>{S=JSON.parse(prev);persist();render()})},
+  "clear-examples":()=>{const prev=JSON.stringify(S);S.entries=S.entries.filter(e=>!e.example);persist();render();toast("Examples cleared.",()=>{S=JSON.parse(prev);persist();render()})},
   "toggle-key":()=>{showKey=!showKey;render()},
   "remove-key":()=>{S.settings.key="";S.settings.ai=false;testMsg="";persist();render();toast("Key removed.")},
   "load-models":async()=>{modelMsg="Loading…";render();
@@ -1112,14 +1049,10 @@ $("main").addEventListener("keydown",e=>{if(e.key!=="Enter"||e.target.id!=="cap-
   if(draft.amt.trim()||/\d$/.test(draft.name.trim()))saveCapture();else $("cap-amt")?.focus()});
 $("main").addEventListener("input",e=>{const t=e.target,d=t.dataset;
   if(d.draft&&d.draft!=="date"){draft[d.draft]=t.value;if(capErr){capErr="";t.closest("form")?.querySelector(".err")?.replaceChildren()}}
-  else if(d.rec){recDraft[d.rec]=t.value;if(d.rec==="stmt")refreshReconcile()}
-  else if(d.card)cardDraft[d.card]=t.value;
   else if(d.mq){modelQuery=t.value;const results=document.querySelector(".models");if(results)results.innerHTML=modelOptionsHTML()}
   else if(d.set&&t.type!=="checkbox"){S.settings[d.set]=d.set==="currency"?safeCurrency(t.value):d.set==="model"||d.set==="key"?t.value.trim():t.value;testMsg="";persist()}});
 $("main").addEventListener("change",e=>{const t=e.target,d=t.dataset;
   if(d.draft==="date"){draft.date=t.value||today();render()}
-  else if(d.rec&&t.type==="date"){recDraft[d.rec]=t.value||today();render()}
-  else if(d.card==="date")cardDraft.date=t.value||today();
   else if(d.cycle){const n=Number(t.value);if(validCycleStart(n)){S.settings.cycleStart=n;persist()}render();toast(`Financial month now starts on day ${S.settings.cycleStart}.`)}
   else if(d.num){const v=parseMoney(t.value);if(v!=null){S.settings[d.num]=v;persist()}render()}
   else if(d.set&&t.type==="checkbox"){S.settings[d.set]=t.checked;persist();
