@@ -23,3 +23,9 @@ The app focuses on logging expenses, reviewing categories and monitoring spendin
 ## Backup and history
 
 **Settings → Data → Download JSON** exports all records in backup format v2, excluding your OpenRouter API key. Older v1 backups can also be imported. **Merge** skips records with IDs already present. **Replace** discards the current ledger after confirmation. Receipt CSV exports only the chosen date range and is not a restore backup. The app does not automatically sync between devices.
+
+## Smart tools
+
+Smart Capture is available from the new expense sheet. Parse simple lists locally or explicitly ask the configured AI provider to interpret more complex text. Review and edit every proposed entry before saving. Receipt includes Ask your ledger: the model interprets a question into a restricted query, and the local database calculates the answer. Overview shows a local spending forecast and comparable period statistics, with optional AI insights cached on the device. Review includes a local check of the past 90 days for duplicates, unusually large purchases, inconsistent categories and potential recurring payments. These checks never automatically change records.
+
+Smart Capture sends the entered text and category context only when Ask AI is selected. Ledger queries send the question and date/category context, not transaction history. Generated insights send aggregated figures only. Ordinary manual capture, forecasts and review checks continue to work without AI. Reports are estimates based on recorded spending, not a guarantee of future spending. No new database schema or data migration is required.
