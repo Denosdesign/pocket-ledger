@@ -945,7 +945,7 @@ function viewToday(){const t=today(),tot=DATA.todaySpent,m=monthStats(),todays=D
       </button></div>
     <div class="metric-value" aria-live="polite">${fig(cumulative?m.spent:tot)}</div>
     <div class="hero-footer"><span class="budget-remain">${m.left>=0?`${money(m.left)} remaining`:`${money(-m.left)} over budget`}</span><span class="budget-context" title="${esc(m.name)}">${esc(m.name)}</span></div>
-    <div class="meter${m.left<0?" over":""}"><i style="width:${m.budget?Math.min(100,m.spent/m.budget*100):0}%"></i></div>
+    <div class="meter${m.left<0?" over":""}"><i style="width:${m.budget?Math.max(0,Math.min(100,m.spent/m.budget*100)):0}%"></i></div>
   </section>
   <section class="history today-history" aria-label="Today’s entries">
     <div class="section-head"><h3>Today’s entries</h3><span>${todays.length} ${todays.length===1?"entry":"entries"}</span></div>
@@ -993,7 +993,7 @@ function viewReview(){const pend=DATA.review.filter(needsReview),aiList=DATA.rev
     ${aiList.map(e=>`<div class="item"><div class="line"><span>${esc(e.name)}</span><span class="v">${esc(e.category)}</span></div>${opts(e)}</div>`).join("")}</section>`:""}
   ${foot()}`}
 
-function viewOverview(){const m=monthStats(),pct=m.budget?Math.min(100,m.spent/m.budget*100):0;
+function viewOverview(){const m=monthStats(),pct=m.budget?Math.max(0,Math.min(100,m.spent/m.budget*100)):0;
   const stats=DATA.overview||{categories:{},unknown:0,adjustments:0,count:0};
   const g=new Map(Object.entries(stats.categories));
   const cats=[...g].filter(([k])=>k!=="Uncategorised").sort((a,b)=>b[1]-a[1]),flags=[];
@@ -1131,15 +1131,15 @@ async function openSheet(id,preset={}){
 function closeSheet(){sheet=null;$("sheet-root").innerHTML="";document.body.classList.remove("dialog-open");
   if(sheetReturnFocus?.isConnected)sheetReturnFocus.focus({preventScroll:true})}
 function renderSheet(){if(!sheet){closeSheet();return}const s=sheet,t=today();
-  const types=[["purchase","Purchase"],["unknown","No name"]];
-  if(s.id&&["adjustment","repayment"].includes(s.type))types.push([s.type,s.type==="adjustment"?"Adjustment":"Repayment"]);
-  const hint={purchase:"",unknown:"Counts as spending, kept out of categories.",adjustment:"Historical correction. Use a minus sign to reduce spending.",repayment:"Historical repayment record. Not counted as spending."}[s.type];
+  const types=[["purchase","Purchase"],["unknown","No name"],["adjustment","Adjustment"]];
+  if(s.id&&s.type==="repayment")types.push(["repayment","Repayment"]);
+  const hint={purchase:"",unknown:"Counts as spending, kept out of categories.",adjustment:"Enter a positive amount to increase spending, or a negative amount to reduce it.",repayment:"Historical repayment record. Not counted as spending."}[s.type];
   const fid=document.activeElement?.id;
   $("sheet-root").innerHTML=`<div class="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Expense entry">
     <div class="eyebrow">${s.id?"EDIT ENTRY":"NEW EXPENSE"}</div><h3 style="margin:12px 0 20px">${s.id?"Edit expense":"New expense"}</h3>
     <div class="opts" role="group" aria-label="Type">${types.map(([k,l])=>`<button type="button" data-sact="type" data-v="${k}" aria-pressed="${s.type===k}">${l}</button>`).join("")}</div>
     ${hint?`<p class="note">${hint}</p>`:""}
-    <label class="fld"><span>Name</span><input class="in" id="s-name" data-s="name" value="${esc(s.name)}" placeholder="${s.type==="unknown"?"???":"Lunch"}" maxlength="40" autocapitalize="words"></label>
+    <label class="fld"><span>Name</span><input class="in" id="s-name" data-s="name" value="${esc(s.name)}" placeholder="${s.type==="unknown"?"???":s.type==="adjustment"?"e.g. Refund":"Lunch"}" maxlength="40" autocapitalize="words"></label>
     ${!s.id&&s.type==="purchase"&&recentLabels().length?`<div class="recent">${recentLabels().slice(0,4).map(r=>`<button type="button" data-sact="recent" data-label="${esc(r.label)}">${esc(r.label)}</button>`).join("")}</div>`:""}
     <div class="two"><label class="fld amt"><span>Amount</span><input class="in" id="s-amt" data-s="amt" value="${esc(s.amt)}" inputmode="${s.type==="adjustment"?"text":"decimal"}" placeholder="0"><span aria-hidden="true">${cur()}</span></label>
     <label class="fld"><span>Date</span><input class="in" type="date" id="s-date" data-s="date" value="${s.date}" max="${t}"></label></div>
@@ -1147,10 +1147,10 @@ function renderSheet(){if(!sheet){closeSheet();return}const s=sheet,t=today();
     <p class="err" role="status">${esc(s.err)}</p>
     <div class="acts" style="margin-top:24px">${s.id?`<button type="button" class="link warn" data-sact="delete">${s.armed?"Tap again to delete":"Delete"}</button>`:`<button type="button" class="link" data-sact="cancel">Cancel</button>`}<button type="button" class="btn push" data-sact="save">Save</button></div>
   </div></div>`;if(fid)$(fid)?.focus({preventScroll:true})}
-async function saveSheet(){const s=sheet;if(!s)return;const allowNeg=s.type==="adjustment",amount=parseMoney(s.amt,allowNeg);let name=s.name.trim();
-  if(!name){if(s.type==="unknown")name="???";else if(["repayment","adjustment"].includes(s.type))name=s.type;else{s.err="Add a short name.";renderSheet();return}}
+async function saveSheet(){const s=sheet;if(!s)return;const allowNeg=s.type==="adjustment",amount=parseMoney(allowNeg?String(s.amt).trim().replace(/^\+/,""):s.amt,allowNeg);let name=s.name.trim();
+  if(!name){if(s.type==="unknown")name="???";else if(s.type==="adjustment")name="Adjustment";else if(s.type==="repayment")name="Repayment";else{s.err="Add a short name.";renderSheet();return}}
   if(!validDate(s.date)){s.err="Choose a valid date.";renderSheet();return}
-  if(amount==null){s.err="Enter a valid amount above zero.";renderSheet();return}
+  if(amount==null){s.err=allowNeg?"Enter a nonzero positive or negative amount.":"Enter a valid amount above zero.";renderSheet();return}
   const old=s.id?await getEntry(s.id):null,isNew=!old;
   const e=old?{...old}:{id:uid(),created:new Date().toISOString(),category:null,status:"none"};
   const prevName=e.name,prevType=e.type,prevCat=e.category;
