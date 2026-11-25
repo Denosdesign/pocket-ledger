@@ -576,7 +576,7 @@ input:not([type=checkbox]):not([type=radio]),select,textarea{font-size:max(16px,
 "use strict";
 const STORE_KEY="pocket-ledger-v1";
 const BASE_CATEGORIES=["Food","Groceries","Transport","Clothing","Shopping","Entertainment","Health","Bills","Home","Travel","Other"];
-const categories=()=>[...BASE_CATEGORIES,...(S.customCategories||[])];
+const categories=()=>[...BASE_CATEGORIES.filter(c=>c!=="Other"),...(S.customCategories||[]),"Other"];
 const COLOURWAYS={apricot:{name:"Apricot",colour:"#F18A47"},blue:{name:"Blue",colour:"#547BDC"},green:{name:"Jade",colour:"#44A786"},rose:{name:"Rose",colour:"#D97591"}};
 const THEME_MODES=["light","dark","system"];
 const SPEND=new Set(["purchase","unknown","adjustment"]);
@@ -961,7 +961,7 @@ function queueAI(ids){for(const id of ids){if(aiPending.has(id))continue;aiPendi
   aiChain=aiChain.then(()=>runAI(id)).catch(()=>{})}}
 async function runAI(id){
   let e=await getEntry(id);if(!e){aiPending.delete(id);return}
-  const k=norm(e.name),signature=categories().join("|")+"|"+S.settings.suggestNew;
+  const k=norm(e.name),signature=[...BASE_CATEGORIES,...(S.customCategories||[])].join("|")+"|"+S.settings.suggestNew;
   try{
     if(!["none","pending"].includes(e.status))return;
     e.status="pending";await dbPut(e);
@@ -1069,7 +1069,7 @@ function viewReview(){const pend=DATA.review.filter(needsReview),aiList=DATA.rev
 function viewOverview(){const m=monthStats(),pct=m.budget?Math.max(0,Math.min(100,m.spent/m.budget*100)):0;
   const stats=DATA.overview||{categories:{},unknown:0,adjustments:0,count:0};
   const g=new Map(Object.entries(stats.categories));
-  const cats=[...g].filter(([k])=>k!=="Uncategorised").sort((a,b)=>b[1]-a[1]),flags=[];
+  const cats=[...g].filter(([k])=>k!=="Uncategorised").sort((a,b)=>(a[0]==="Other")-(b[0]==="Other")||b[1]-a[1]),flags=[];
   if(g.get("Uncategorised"))flags.push(["Uncategorised",g.get("Uncategorised")]);
   if(stats.unknown)flags.push(["Name unknown",stats.unknown]);
   if(stats.adjustments)flags.push(["Adjustments",stats.adjustments]);
