@@ -498,6 +498,40 @@ input:not([type=checkbox]):not([type=radio]),select,textarea{font-size:max(16px,
 .capture-footer .btn{padding:0 18px}
 .capture-error{margin:10px 0}
 @media(max-width:360px){.entry-modes button{font-size:13px}.receipt-period{padding:12px 12px 5px}.capture-footer{gap:8px}.capture-footer .btn{padding:0 14px}.receipt-period+.filters{gap:12px}}
+
+/* Settings navigation and deliberate destructive actions. */
+.settings-title{margin:26px 0 24px}
+.settings-group-label{font-size:12px;color:var(--muted);font-weight:500;margin:24px 4px 8px}
+.settings-group{border:1px solid var(--line);border-radius:17px;overflow:hidden;background:var(--surface)}
+.settings-row{display:flex;width:100%;align-items:center;gap:12px;min-height:68px;text-align:left;padding:13px 14px;background:transparent;border:0;color:var(--ink)}
+.settings-group .settings-row+.settings-row{border-top:1px solid var(--line)}
+.settings-row:active{background:var(--soft)}
+.settings-icon{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:10px;background:var(--soft);color:var(--accent-ink)}
+.settings-icon svg,.settings-chevron,.settings-back svg,.danger-row svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.settings-row-text{min-width:0;flex:1}
+.settings-row strong,.settings-row small{display:block;overflow-wrap:anywhere}
+.settings-row strong{font-size:15px;font-weight:500}
+.settings-row small{font-size:12px;color:var(--muted);line-height:1.45;margin-top:3px}
+.settings-chevron,.danger-row svg{flex:none;color:var(--muted);margin-left:auto;width:16px;height:16px}
+.settings-back{display:inline-flex;align-items:center;gap:5px;background:none;border:0;color:var(--accent-ink);padding:12px 0 0;min-height:44px;font-size:14px}
+.settings-subtitle{font-size:clamp(30px,8vw,42px);line-height:1.1;margin:14px 0 18px}
+.settings-subtitle+.sec{margin-top:20px}
+.settings-subtitle~.sec{margin-top:24px}
+#p-insight-language{font-size:16px}
+.danger-row{padding:13px 0;color:var(--warn);border-top:1px solid var(--line)}
+.erase-warning{background:var(--soft);border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:12px;padding:15px;margin-top:18px}
+.erase-warning strong{color:var(--warn);font-size:16px}
+.erase-warning p{font-size:14px;margin:7px 0 0;line-height:1.55}
+.erase-section{margin-top:22px}
+.erase-section .line{gap:8px}
+.erase-section .line strong{font-size:14px;font-weight:500}
+.erase-check{display:flex;gap:12px;align-items:flex-start;padding:12px 0;font-size:14px;line-height:1.55;cursor:pointer}
+.erase-check input{width:20px;height:20px;flex:none;accent-color:var(--accent);margin:2px 0 0}
+#erase-phrase{font-size:16px}
+.erase-actions{display:grid;gap:12px;margin-top:24px}
+.erase-actions .btn,.erase-final{width:100%;min-height:48px;border-radius:999px;font-size:15px;font-weight:500}
+.erase-final{border:1px solid #B43C36;background:#B43C36;color:#fff;padding:12px 15px}
+.erase-final:disabled{border-color:var(--line);background:var(--soft);color:var(--muted);opacity:.7;cursor:default}
 </style>
 </head>
 <body>
@@ -611,8 +645,13 @@ function dayLabel(s){const t=today();if(s===t)return"Today";if(s===addDays(t,-1)
 function isoWeek(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const day=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-day);const y=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil(((t-y)/864e5+1)/7)}
 const framed=(()=>{try{return window.self!==window.top}catch{return true}})();
 
+const INSIGHT_LANGUAGES={
+  'en-GB':{label:'British English',guide:'Write in natural British English, about 90 to 150 words. Use British spelling and vocabulary.'},
+  'zh-HK-written':{label:'香港中文（書面語）',guide:'使用香港繁體中文書面語，約150至250字。用香港慣用書面詞彙，避免簡體字、內地詞彙、粵語口語助詞及混雜語體。'},
+  'zh-HK-spoken':{label:'香港中文（口語）',guide:'使用自然香港粵語口語及繁體字，約150至250字。可以使用「你今個月」「仲有」「使費」等地道香港粵語表達，避免內地詞彙及簡體字。'}
+};
 function defaults(){return{dict:{},ai:{requests:0,cost:0,lastError:""},
-  customCategories:[],aiResults:{},settings:{budget:600000,currency:"HK$",ai:false,key:"",model:"",deny:true,preferLocal:true,suggestNew:true,palette:"apricot",theme:"light",cycleStart:1},seeded:false}}
+  customCategories:[],aiResults:{},settings:{budget:600000,currency:"HK$",ai:false,key:"",model:"",deny:true,preferLocal:true,suggestNew:true,palette:"apricot",theme:"light",cycleStart:1,insightLanguage:"en-GB"},seeded:false}}
 let S=defaults(),storageOK=true,db=null,dbReady=false,bootError="",saveQueue=Promise.resolve();
 function normaliseState(p={}){
   const d=defaults();S={...d,...p,settings:{...d.settings,...(p.settings||{})},ai:{...d.ai,...(p.ai||{})}};
@@ -620,6 +659,7 @@ function normaliseState(p={}){
   S.settings.palette=COLOURWAYS[S.settings.palette]?S.settings.palette:"apricot";
   S.settings.theme=THEME_MODES.includes(S.settings.theme)?S.settings.theme:"light";
   S.settings.cycleStart=validCycleStart(S.settings.cycleStart)?S.settings.cycleStart:1;
+  S.settings.insightLanguage=Object.hasOwn(INSIGHT_LANGUAGES,S.settings.insightLanguage)?S.settings.insightLanguage:"en-GB";
   S.customCategories=Array.isArray(S.customCategories)?S.customCategories.filter(x=>typeof x==="string"&&x.length>=2&&x.length<=28&&!BASE_CATEGORIES.some(c=>norm(c)===norm(x))).slice(0,32):[];
   if(!S.aiResults||typeof S.aiResults!=="object"||Array.isArray(S.aiResults))S.aiResults={};
   if(!S.dict||typeof S.dict!=="object"||Array.isArray(S.dict))S.dict={};
@@ -980,7 +1020,7 @@ async function runAI(id){
 
 /* UI state */
 let view="today",homeMetric="month",draft={name:"",amt:"",date:today(),unknown:false},capErr="",receiptFilter="all";
-let models=null,modelQuery="",modelMsg="",testMsg="",showKey=false,backupText="",armed={};
+let models=null,modelQuery="",modelMsg="",testMsg="",showKey=false,backupText="";
 let toastTimer=null,categoryDraft="",categoryConfirm="",categoryFeedback="",mergeChoice={};
 
 const cur=()=>esc(S.settings.currency);
@@ -1088,42 +1128,64 @@ function viewOverview(){const m=monthStats(),pct=m.budget?Math.max(0,Math.min(10
 
 function modelOptionsHTML(){const q=norm(modelQuery),list=models?models.filter(m=>!q||norm(m.id+" "+m.name).includes(q)).slice(0,8):[];
   return list.map(m=>`<button type="button" data-act="pick-model" data-id="${esc(m.id)}" aria-pressed="${m.id===S.settings.model}"><span>${esc(m.id)}</span><span>${m.p||m.c?`$${(m.p*1e6).toFixed(2)} / $${(m.c*1e6).toFixed(2)} per 1M`:"free"}</span></button>`).join("")||`<p class="empty">No match.</p>`}
+const PREF_PAGES={appearance:'Appearance',budget:'Budget & financial month',categories:'Categories',intelligence:'AI & insights',learned:'Learned names',data:'Data & backup',erase:'Erase all data'};
+let prefsPage='',eraseState=null,eraseBusy=false,importBusy=false,testBusy=false;
+function settingsRow(id,title,detail,ico){return `<button type="button" class="settings-row" data-act="prefs-page" data-page="${id}"><span class="settings-icon">${ico}</span><span class="settings-row-text"><strong>${esc(title)}</strong><small>${esc(detail)}</small></span><svg class="settings-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg></button>`}
+function prefsIcon(path){return `<svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg>`}
+function settingsHome(){const s=S.settings;
+  return `${masthead()}<h2 class="settings-title">Settings</h2><div class="settings-group-label">Your ledger</div><div class="settings-group">
+    ${settingsRow('budget','Budget & financial month',money(s.budget)+' · Starts on day '+s.cycleStart,prefsIcon('<rect x="4" y="6" width="16" height="15" rx="2"/><path d="M8 3v6m8-6v6M4 11h16"/>'))}
+    ${settingsRow('categories','Categories',categories().length+' categories',prefsIcon('<path d="M3 4h8l10 10-7 7L4 11z"/><circle cx="8" cy="8" r="1"/>'))}
+    ${settingsRow('learned','Learned names',Object.keys(S.dict).length+' remembered names',prefsIcon('<path d="M5 4h14v16H5zM8 8h8m-8 4h8m-8 4h5"/>'))}
+  </div><div class="settings-group-label">Preferences</div><div class="settings-group">
+    ${settingsRow('appearance','Appearance',COLOURWAYS[s.palette].name+' · '+s.theme[0].toUpperCase()+s.theme.slice(1),prefsIcon('<circle cx="12" cy="12" r="8"/><path d="M12 4v16"/>'))}
+    ${settingsRow('intelligence','AI & insights',(aiReady()?'Connected':'Not connected')+' · '+INSIGHT_LANGUAGES[s.insightLanguage].label,prefsIcon('<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/>'))}
+  </div><div class="settings-group-label">Storage</div><div class="settings-group">
+    ${settingsRow('data','Data & backup',storageOK?'Stored on this device':'Storage error',prefsIcon('<path d="M4 7h16v13H4zM3 4h18v3H3zm6 7h6"/>'))}
+  </div>${typeof homeGuideHTML==='function'?homeGuideHTML(true):''}${foot()}`;
+}
+function prefsBack(){if(eraseBusy)return;prefsPage=prefsPage==='erase'?'data':'';eraseState=null;backupText='';render();window.scrollTo(0,0)}
+function openPrefsPage(id){if(eraseBusy||!Object.hasOwn(PREF_PAGES,id)||id==='erase')return;prefsPage=id;backupText='';render();window.scrollTo(0,0)}
 function viewPrefs(){const s=S.settings;
   const dict=Object.entries(S.dict).sort((a,b)=>a[0].localeCompare(b[0]));
   const sw=(id,key,label)=>`<label class="sw"><input type="checkbox" id="${id}" data-set="${key}" ${s[key]?"checked":""} aria-label="${label}"><span></span></label>`;
-  return `${masthead()}
-  <h2>Settings</h2>
-  ${typeof homeGuideHTML==="function"?homeGuideHTML(true):""}
-  <section class="sec appearance-section"><h3><span>Appearance</span></h3>
+
+  if(!prefsPage)return settingsHome();
+  const titles=`${masthead()}<button type="button" class="settings-back" data-act="prefs-back"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10 4-4 4 4 4"/></svg>${prefsPage==='erase'?'Data &amp; backup':'Settings'}</button><h2 class="settings-subtitle">${esc(PREF_PAGES[prefsPage])}</h2>`;
+  let content='';
+  if(prefsPage==='appearance')content=`<section class="sec appearance-section"><h3><span>Colour &amp; theme</span></h3>
     <p class="note">Choose your accent colour and display mode.</p>
     <div class="palette-grid" role="group" aria-label="Accent colour">${Object.entries(COLOURWAYS).map(([id,p])=>`<button type="button" class="palette-choice" data-act="palette" data-v="${id}" aria-pressed="${s.palette===id}"><span class="palette-dot" style="background:${p.colour}"></span><span>${p.name}</span>${s.palette===id?`<span class="palette-tick" aria-hidden="true">✓</span>`:""}</button>`).join("")}</div>
     <div class="theme-choice" role="group" aria-label="Display theme">${THEME_MODES.map(m=>`<button type="button" data-act="theme" data-v="${m}" aria-pressed="${s.theme===m}">${m[0].toUpperCase()+m.slice(1)}</button>`).join("")}</div>
-  </section>
-  <section class="sec"><h3><span>Financial month</span></h3>
+  </section>`;
+  else if(prefsPage==='budget')content=`<section class="sec"><h3><span>Budget</span></h3>
+    <div class="two">
+      <label class="fld amt"><span>Per financial month</span><input class="in sm" id="p-budget" data-num="budget" value="${plain(s.budget)}" inputmode="decimal"><span class="sm" aria-hidden="true">${cur()}</span></label>
+      <label class="fld"><span>Currency</span><input class="in sm" id="p-cur" data-set="currency" value="${esc(s.currency)}" maxlength="5"></label>
+    </div>
+  </section><section class="sec"><h3><span>Financial month</span></h3>
     <p class="note">Set the date your monthly budget resets. It also sets the reporting period for Overview and Receipt.</p>
     <label class="fld"><span>Start a new financial month on</span><select class="in sm cycle-select" id="p-cycle" data-cycle="1" aria-label="Financial month start day">
       ${Array.from({length:31},(_,i)=>i+1).map(day=>`<option value="${day}" ${s.cycleStart===day?"selected":""}>${day}${day===31?" · end of month":""}</option>`).join("")}
     </select></label>
     <div class="cycle-preview" aria-live="polite"><span>Current financial month</span><strong>${esc(monthStats().name)}</strong></div>
     <p class="note">For months with fewer days, the period starts on the last available day. For example, choosing 31 means the final day of every month.</p>
-  </section>
-  <section class="sec"><h3><span>Budget</span></h3>
-    <div class="two">
-      <label class="fld amt"><span>Per financial month</span><input class="in sm" id="p-budget" data-num="budget" value="${plain(s.budget)}" inputmode="decimal"><span class="sm" aria-hidden="true">${cur()}</span></label>
-      <label class="fld"><span>Currency</span><input class="in sm" id="p-cur" data-set="currency" value="${esc(s.currency)}" maxlength="5"></label>
-    </div>
-  </section>
-  <section class="sec"><h3><span>Categories</span><span>${categories().length} total</span></h3>
+  </section>`;
+  else if(prefsPage==='categories')content=`<section class="sec"><h3><span>Categories</span><span>${categories().length} total</span></h3>
     <p class="note">Create categories locally, without using AI. Similar names are flagged before they are added.</p>
     <label class="fld"><span>New category</span><input class="in sm" id="p-category-name" data-category-input="1" value="${esc(categoryDraft)}" maxlength="28" placeholder="e.g. Pet care" autocomplete="off"></label>
     ${categoryFeedback?`<p class="note${categoryConfirm?" warn":""}" role="status">${esc(categoryFeedback)}</p>`:""}
     <div class="acts"><button class="btn" type="button" data-act="add-category">${categoryConfirm?"Add anyway":"Add category"}</button>${categoryConfirm?`<button class="link" type="button" data-act="cancel-category">Use an existing one</button>`:""}</div>
     ${S.customCategories.length?`<div class="custom-cat-list">${S.customCategories.map(c=>`<div class="custom-cat"><strong>${esc(c)}</strong><label class="sr" for="merge-${esc(norm(c))}">Merge ${esc(c)} into</label><select id="merge-${esc(norm(c))}" data-merge="${esc(c)}" class="in sm"><option value="">Merge into…</option>${categories().filter(x=>x!==c).map(x=>`<option value="${esc(x)}" ${mergeChoice[c]===x?"selected":""}>${esc(x)}</option>`).join("")}</select><button class="link ink" type="button" data-act="merge-category" data-cat="${esc(c)}">Merge</button></div>`).join("")}</div>`:""}
-  </section>
-  <section class="sec"><h3><span>AI categories</span><span>OpenRouter</span></h3>
+  </section>`;
+  else if(prefsPage==='learned')content=`<section class="sec"><h3><span>Learned names</span><span>${dict.length||""}</span></h3>
+    ${dict.length?dict.map(([k,v])=>`<div class="line"><span>${esc(k)}</span><span class="v muted" style="color:var(--muted)">${esc(v)}<button class="x" data-act="forget" data-k="${esc(k)}" aria-label="Forget ${esc(k)}">×</button></span></div>`).join(""):`<p class="empty">Categories you choose are remembered here.</p>`}
+  </section>`;
+  else if(prefsPage==='intelligence')content=`<section class="sec"><h3><span>Spending insights</span></h3><label class="fld"><span>Report language</span><select class="in" id="p-insight-language" data-insight-language="1">${Object.entries(INSIGHT_LANGUAGES).map(([id,l])=>`<option value="${id}" ${s.insightLanguage===id?'selected':''}>${esc(l.label)}</option>`).join('')}</select></label><p class="note">Only AI spending insights use this language. The app interface and category names stay in English. Changing language makes the previous insight outdated; generate a new one when ready.</p></section><section class="sec"><h3><span>Automatic categorisation</span></h3>
     <div class="line"><span>Suggest categories for new names</span>${sw("p-ai","ai","Suggest categories for new names")}</div>
     <div class="line"><span>Check known names first</span>${sw("p-local","preferLocal","Check known names first")}</div>
     <div class="line"><span>Suggest a new category when needed<small>Requires your approval in Review</small></span>${sw("p-propose","suggestNew","Suggest new categories")}</div>
+  </section><section class="sec"><h3><span>Provider &amp; privacy</span><span>OpenRouter</span></h3>
     <div class="line"><span>Avoid providers that keep data</span>${sw("p-deny","deny","Avoid providers that keep data")}</div>
     <label class="fld"><span>API key</span><input class="in sm" id="p-key" data-set="key" type="${showKey?"text":"password"}" value="${esc(s.key)}" placeholder="sk-or-…" autocomplete="off" spellcheck="false"></label>
     <div class="acts" style="margin-top:4px"><button class="link" data-act="toggle-key">${showKey?"Hide":"Show"}</button>${s.key?`<button class="link" data-act="remove-key">Remove</button>`:""}</div>
@@ -1134,21 +1196,21 @@ function viewPrefs(){const s=S.settings;
     ${modelMsg?`<p class="note">${esc(modelMsg)}</p>`:""}
     ${testMsg?`<p class="note${testMsg.startsWith("Connected")?"":" warn"}">${esc(testMsg)}</p>`:""}
     ${S.ai.lastError&&!testMsg?`<p class="note warn">${esc(S.ai.lastError)}</p>`:""}
-    <div class="line" style="margin-top:8px"><span>Usage<small>${S.ai.requests} request${S.ai.requests===1?"":"s"} · US$${S.ai.cost.toFixed(4)}</small></span><button class="link" data-act="reset-usage">Reset</button></div>
-    <p class="note">Previously recognised names are handled locally. Category suggestions send unfamiliar purchase labels and category names. Smart capture sends your entered text only when you tap Ask AI; ledger queries send your question and date/category context; insights send aggregated statistics only. Suggestions never create categories automatically. Anthropic models are excluded. Your key stays in this browser.${framed?" AI requires your hosted copy.":""}</p>
-  </section>
-  <section class="sec"><h3><span>Learned names</span><span>${dict.length||""}</span></h3>
-    ${dict.length?dict.map(([k,v])=>`<div class="line"><span>${esc(k)}</span><span class="v muted" style="color:var(--muted)">${esc(v)}<button class="x" data-act="forget" data-k="${esc(k)}" aria-label="Forget ${esc(k)}">×</button></span></div>`).join(""):`<p class="empty">Categories you choose are remembered here.</p>`}
-  </section>
-  <section class="sec"><h3><span>Data</span><span>${storageOK?"IndexedDB · this device":"Not saving"}</span></h3>
+  </section><section class="sec"><h3><span>Usage</span></h3><div class="line" style="margin-top:8px"><span>Usage<small>${S.ai.requests} request${S.ai.requests===1?"":"s"} · US$${S.ai.cost.toFixed(4)}</small></span><button class="link" data-act="reset-usage">Reset</button></div>
+    <p class="note">Previously recognised names are handled locally. Category suggestions send unfamiliar purchase labels and category names. Smart capture sends your entered text only when you tap Use AI; ledger queries send your question and date/category context; insights send aggregated statistics only. Suggestions never create categories automatically. Anthropic models are excluded. Your key stays in this browser.${framed?" AI requires your hosted copy.":""}</p>
+  </section>`;
+  else if(prefsPage==='data')content=`<section class="sec"><h3><span>Backup &amp; restore</span><span>${storageOK?"IndexedDB · this device":"Not saving"}</span></h3>
     <p class="note data-note">Each entry is stored separately on this device. Your old browser data was kept during migration. Safari and the Home Screen app still have separate storage.</p>
     <p class="note data-note">A full JSON backup is the only way to move all your records to another device. CSV is for reporting, not restoring.</p>
     <div class="acts" style="margin-top:0"><button class="link ink" data-act="copy-backup">Copy backup</button><button class="link ink" data-act="download-backup">Download JSON</button></div>
     <label class="fld"><span>When importing a backup</span><select class="in sm" id="p-import-mode" aria-label="Import mode"><option value="merge">Merge without duplicating entries</option><option value="replace">Replace all existing data</option></select></label>
     <div class="acts"><label class="link ink" for="p-import">Choose backup<input type="file" id="p-import" accept="application/json,.json" hidden></label></div>
     ${backupText?`<textarea class="in" id="p-backup" readonly aria-label="Backup text">${esc(backupText)}</textarea>`:""}
-    <div class="acts">${hasExamples()?`<button class="link" data-act="clear-examples">Clear examples</button>`:""}<button class="link warn" data-act="erase">${armed.erase?"Tap again to erase":"Erase everything"}</button></div>
-  </section>`}
+    </section><section class="sec"><h3><span>Maintenance</span></h3>${hasExamples()?`<button class="link" data-act="clear-examples">Clear examples</button>`:""}<button type="button" class="settings-row danger-row" data-act="prefs-erase"><span><strong>Erase all data</strong><small>Permanently reset Pocket Ledger on this device</small></span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg></button>
+  </section>`;
+  else if(prefsPage==='erase')content=eraseHTML();
+  return titles+content+`${foot()}`;
+}
 
 const RENDER={today:viewToday,receipt:viewReceipt,review:viewReview,overview:viewOverview,prefs:viewPrefs};
 function render(){
@@ -1164,7 +1226,7 @@ function route(){const h=location.hash.slice(1),next=VIEWS.includes(h)?h:"today"
   clearTimeout(routeTimer);const main=$("main");
   if(next===view){main.classList.remove("is-leaving");render();return}
   const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const enter=()=>{view=next;main.classList.remove("is-leaving","is-entering");main.removeAttribute("aria-busy");
+  const enter=()=>{if(next!=="prefs"&&!eraseBusy){prefsPage="";eraseState=null;backupText=""}view=next;main.classList.remove("is-leaving","is-entering");main.removeAttribute("aria-busy");
     window.scrollTo({top:0,behavior:"instant"});refreshView();
     if(!reduced)requestAnimationFrame(()=>main.classList.add("is-entering"))};
   if(reduced){enter();return}
@@ -1179,7 +1241,7 @@ function toast(msg,undo){clearTimeout(toastTimer);const r=$("toast-root");
 function savedMsg(e){const m=monthStats();return `${e.name} saved.`}
 async function removeEntry(id){await dbDelete(id);visible.delete(id);await refreshView()}
 async function saveCapture(){
-  if(!dbReady)return;
+  if(!dbReady||eraseBusy)return;
   const amount=parseMoney(draft.amt);const name=draft.unknown?"???":draft.name.trim();
   if(!name){capErr="Add a short name.";render();return}
   if(amount===null){capErr="Enter an amount above zero.";render();return}
@@ -1193,7 +1255,7 @@ async function saveCapture(){
 }
 let sheet=null,sheetReturnFocus=null;
 async function openSheet(id,preset={}){
-  if(!dbReady)return;
+  if(!dbReady||eraseBusy)return;
   const e=id?await getEntry(id):null;
   if(id&&!e){toast("Entry not found.");return}
   sheet={id:e?.id||null,type:e?.type||preset.type||"purchase",name:e?.name||preset.name||"",amt:e?plain(e.amount):"",date:e?.date||preset.date||today(),category:e?.category||"",err:"",armed:false};
@@ -1291,7 +1353,7 @@ function validateBackup(p){
 }
 async function importData(text,mode="merge"){
   let p;try{p=JSON.parse(text);validateBackup(p)}catch(e){toast(e.message||"Invalid backup.");return}
-  if(mode==="replace"&&!confirm(`Replace all current records with ${p.entries.length} entries from this backup? This cannot be undone.`))return;
+  if(mode==="replace"&&prompt(`Replace all current records with ${p.entries.length} entries from this backup? Save your current JSON backup first. This cannot be undone. Type REPLACE ALL DATA to continue.`)!=="REPLACE ALL DATA")return;
   const d=defaults(),opts=p.settings||{},ai=p.ai||{},key=S.settings.key;
   const imported=Array.isArray(p.customCategories)?p.customCategories:[];
   let newState={...d,dict:p.dict||{},customCategories:imported,aiResults:{},ai:{requests:Number.isSafeInteger(ai.requests)&&ai.requests>=0?ai.requests:0,cost:Number.isFinite(ai.cost)&&ai.cost>=0?ai.cost:0,lastError:""},
@@ -1502,12 +1564,12 @@ function insightPayload(a){
     concentration:{named_purchase_days:days.length,largest_day_share_of_named_purchase_spending_percentage:days.length>=2?pct(Math.max(...days),current.grossPurchases||0):null,
       named_purchase_total:money(current.grossPurchases||0)},coverage_note:'Only recorded expenses are known. Missing entries, future bills and essential versus optional purchases are not known. Today may be incomplete.'};
 }
-const insightKey=a=>JSON.stringify(['insights-actionable-en-GB-v3',S.settings.model,insightPayload(a)]);
+const insightKey=a=>JSON.stringify(['insights-actionable-v4',S.settings.insightLanguage,S.settings.model,insightPayload(a)]);
 function insightsHTML(){const a=DATA.analytics;if(!a)return '';const p=a.previous,c=a.current,diff=c.spent-p.spent,percent=a.comparable&&p.spent>0?Math.round(diff/p.spent*100):null;
   const cache=S.insightCache,hit=cache&&cache.key===insightKey(a)&&typeof cache.text==='string';const top=Object.entries(c.categories).sort((x,y)=>y[1]-x[1])[0];
   return `<section class="sec"><h3><span>Spending forecast</span><span>Estimate</span></h3>${a.forecast?`<strong class="smart-number">${money(a.forecast.amount)}</strong><p class="note">${esc(a.forecast.method)} ${a.forecast.amount>S.settings.budget?'Above your current budget.':'Within your current budget.'} Assumes entries are complete; excludes unknown future bills.</p>`:'<p class="note">Not enough recorded spending yet for a useful estimate.</p>'}</section><section class="sec"><h3><span>${aiMark} Spending insights</span><button type="button" class="link ink" data-act="insight-run" ${insightsBusy||!c.count?'disabled':''}>${insightsBusy?'Generating…':hit?'Regenerate':'Generate insights'}</button></h3>${a.comparable?`<div class="line"><span>Same elapsed period last month<small>${esc(a.previousFrom)} to ${esc(a.previousTo)}</small></span><strong>${money(p.spent)}</strong></div><div class="line"><span>Recorded this month<small>${esc(a.from)} to ${esc(a.to)}</small></span><strong>${money(c.spent)}</strong></div><p class="note">${money(diff,{sign:true})}${percent!==null?' · '+Math.abs(percent)+'% '+(percent>0?'higher':percent<0?'lower':'change'):''}</p>`:'<p class="note">No comparable prior period with entries yet.</p>'}${top?`<p class="note">Largest category so far: ${esc(top[0])} · ${money(top[1])}.</p>`:''}<p class="note">AI receives only these aggregated figures, not receipt names or individual transactions.</p>${hit?`<div class="smart-result"><p class="smart-report">${esc(cache.text)}</p><p class="note">Saved insight · ${esc(cache.date||'')}</p></div>`:''}${insightsError?`<p class="err" role="status">${esc(insightsError)}</p>`:''}</section>`
 }
-async function generateInsights(){const a=DATA.analytics;if(!a||insightsBusy||!a.current.count)return;const key=insightKey(a);insightsBusy=true;insightsError='';render();try{const j=await smartRemote('Act as a practical personal budgeting companion, not a report summariser. Write in natural British English, 90 to 150 words, in two or three short plain text paragraphs. Give the most useful decisions for the remaining financial month, not a list of totals already visible. First, assess urgency using the gap between budget used and time elapsed, and give the actual remaining daily allowance including today if a budget exists. If already over budget, say so and focus on limiting further overspend, not a zero daily target as a realistic living budget. Second, explain the most meaningful spending driver using transaction frequency, concentration or a comparable category change when supported; distinguish a single purchase from repeated purchases but never assume a large payment is exceptional or optional. Where only one or two days or a few purchases exist, say the pattern is tentative. Third, offer a specific, achievable adjustment for the next few days, such as a suggested spending envelope or delaying further discretionary purchases if appropriate; use the supplied daily or seven-day allowance and required reduction only when relevant. Preserve room for essentials and do not tell the user to reduce necessary transport or health spending. If the budget is unrealistic, explain the tension rather than shame the user. If comfortably on pace, say what is working and avoid unnecessary austerity. Use prior comparisons only if comparable is true. Forecast is uncertain, especially when a small number of large payments drives current pace. Do not claim future expenses or logging completeness are known. All monetary figures are preformatted in the actual currency: reproduce them exactly and use only supplied figures and percentages. Never calculate, convert, multiply, divide, invent or round figures. The period is the financial month to date, not a week. Use only the most relevant evidence, do not repeat every number, do not give generic advice such as review spending without a concrete next step. No headings, JSON, tables, preambles or investment advice.',insightPayload(a),'text');S.insightCache={key,text:j,date:today()};await persist()}catch(e){insightsError=e.message}finally{insightsBusy=false;render()}}
+async function generateInsights(){const a=DATA.analytics;if(!a||insightsBusy||!a.current.count)return;const key=insightKey(a);insightsBusy=true;insightsError='';render();try{const j=await smartRemote('Act as a practical personal budgeting companion, not a report summariser. '+INSIGHT_LANGUAGES[S.settings.insightLanguage].guide+' Use two or three short plain text paragraphs. Give the most useful decisions for the remaining financial month, not a list of totals already visible. First, assess urgency using the gap between budget used and time elapsed, and give the actual remaining daily allowance including today if a budget exists. If already over budget, say so and focus on limiting further overspend, not a zero daily target as a realistic living budget. Second, explain the most meaningful spending driver using transaction frequency, concentration or a comparable category change when supported; distinguish a single purchase from repeated purchases but never assume a large payment is exceptional or optional. Where only one or two days or a few purchases exist, say the pattern is tentative. Third, offer a specific, achievable adjustment for the next few days, such as a suggested spending envelope or delaying further discretionary purchases if appropriate; use the supplied daily or seven-day allowance and required reduction only when relevant. Preserve room for essentials and do not tell the user to reduce necessary transport or health spending. If the budget is unrealistic, explain the tension rather than shame the user. If comfortably on pace, say what is working and avoid unnecessary austerity. Use prior comparisons only if comparable is true. Forecast is uncertain, especially when a small number of large payments drives current pace. Do not claim future expenses or logging completeness are known. All monetary figures are preformatted in the actual currency: reproduce them exactly and use only supplied figures and percentages. Never calculate, convert, multiply, divide, invent or round figures. The period is the financial month to date, not a week. Use only the most relevant evidence, do not repeat every number, do not give generic advice such as review spending without a concrete next step. No headings, JSON, tables, preambles or investment advice.',insightPayload(a),'text');S.insightCache={key,text:j,date:today()};await persist()}catch(e){insightsError=e.message}finally{insightsBusy=false;render()}}
 /* Smart Review: bounded local checks, no automated edits or API requests. */
 function reviewChecks(rows){const dup=new Map(),names=new Map(),result=[];const add=(kind,message,entries)=>{if(result.length<30)result.push({kind,message,entries:entries.slice(0,5)})};
   for(const e of rows){if(e.type!=='purchase')continue;const n=norm(e.name);if(!n)continue;const k=JSON.stringify([n,e.date,e.amount]);if(!dup.has(k))dup.set(k,[]);dup.get(k).push(e);if(!names.has(n))names.set(n,[]);names.get(n).push(e)}
@@ -1526,7 +1588,48 @@ async function loadSmartReview(to=today()){
 }
 function smartReviewHTML(){const r=DATA.latestReview;return `<section class="sec"><h3><span>Smart review</span><button class="link" data-act="smart-review" aria-label="Refresh smart review">Refresh</button></h3>${r?.error?`<p class="err" role="status">${esc(r.error)}</p>`:r?`<p class="note">Automatically checked ${r.count} entries · Last 90 days · ${esc(new Date(r.checkedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}))}</p>${r.checks.length?r.checks.map(x=>`<div class="smart-result"><strong>${esc(x.kind)}</strong><p class="note">${esc(x.message)}</p>${x.entries.map(e=>`<button class="row" data-act="edit" data-id="${esc(e.id)}"><span class="nm">${esc(e.name)}</span><span class="meta">${esc(e.date)}</span><span class="v">${money(e.amount)}</span></button>`).join('')}</div>`).join(''):r.count?'<p class="empty">No obvious patterns to review.</p>':'<p class="empty">No recent records to check.</p>'}`:'<p class="note">Checking recent records…</p>'}<p class="note">Runs on this device. No records are changed automatically.</p></section>`}
 
+function eraseBlocked(){return !dbReady||aiPending.size>0||askBusy||insightsBusy||importBusy||testBusy||Boolean(sheet)||Boolean(categoryModal)}
+async function openErasePage(){if(eraseBusy||view!=='prefs'||prefsPage!=='data')return;
+  prefsPage='erase';const state={count:null,confirmed:false,phrase:'',error:''};eraseState=state;render();window.scrollTo(0,0);
+  try{const count=await dbRequest(db.transaction('entries','readonly').objectStore('entries').count());if(eraseState===state)state.count=count}catch{if(eraseState===state)state.error='Unable to verify your records. Return to Data & backup and try again.'}
+  if(eraseState===state)render();
+}
+function canErase(state=eraseState){return Boolean(state&&Number.isInteger(state.count)&&state.confirmed&&state.phrase==='ERASE ALL DATA'&&!eraseBusy&&!eraseBlocked())}
+function eraseHTML(){const s=eraseState;if(!s)return '';
+  return `<section class="erase-warning"><strong>This cannot be undone.</strong><p>Erasing Pocket Ledger permanently removes the records and preferences saved in this browser or Home Screen app. It does not delete backups you have saved elsewhere.</p></section>
+  <section class="sec erase-section"><h3><span>What will be removed</span></h3><div class="line"><span>Expense and adjustment records</span><strong>${s.count===null?'Checking…':s.count}</strong></div><div class="line"><span>Custom categories &amp; learned names</span></div><div class="line"><span>Budget, appearance and AI settings</span></div><div class="line"><span>API key, insight history and legacy ledger data</span></div></section>
+  <section class="sec erase-section"><h3><span>Save a backup first</span></h3><p class="note">Download or copy a JSON backup and verify it before continuing. Backups do not include the API key.</p><div class="acts"><button type="button" class="link ink" data-act="download-backup" ${eraseBusy?'disabled':''}>Download JSON</button><button type="button" class="link ink" data-act="copy-backup" ${eraseBusy?'disabled':''}>Copy backup</button></div>${backupText?`<textarea class="in" id="p-backup" readonly aria-label="Backup text">${esc(backupText)}</textarea>`:''}</section>
+  <section class="sec erase-section"><h3><span>Confirm permanent deletion</span></h3><label class="erase-check"><input type="checkbox" id="erase-ack" ${s.confirmed?'checked':''} ${eraseBusy?'disabled':''}><span>I have saved a backup, or accept that my data cannot be recovered.</span></label><label class="fld"><span>Type ERASE ALL DATA exactly to continue</span><input class="in" id="erase-phrase" value="${esc(s.phrase)}" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ERASE ALL DATA" ${eraseBusy?'disabled':''}></label>
+  ${eraseBlocked()?'<p class="note">An operation is still running. Wait for it to finish, then return here if needed.</p>':''}${s.error?`<p class="err" role="alert">${esc(s.error)}</p>`:''}
+  <div class="erase-actions"><button type="button" class="btn" data-act="prefs-back" ${eraseBusy?'disabled':''}>Cancel</button><button type="button" id="erase-final" class="erase-final" data-act="erase-confirm" ${canErase(s)?'':'disabled'}>${eraseBusy?'Erasing…':'Permanently erase all data'}</button></div></section>`;
+}
+function updateEraseButton(){const button=$('erase-final');if(button)button.disabled=!canErase()}
+async function eraseConfirmed(){
+  const state=eraseState;if(view!=='prefs'||prefsPage!=='erase'||!canErase(state))return;
+  eraseBusy=true;state.error='';render();const main=$('main'),tabs=document.querySelector('.tabs');main.inert=true;if(tabs)tabs.inert=true;
+  let resetDone=false;
+  try{
+    await saveQueue.catch(()=>{});
+    if(eraseBlocked())throw Error('Another operation is running. Please try again.');
+    const count=await dbRequest(db.transaction('entries','readonly').objectStore('entries').count());
+    if(count!==state.count){state.count=count;state.confirmed=false;state.phrase='';throw Error('The number of records changed. Review the new count and confirm again.')}
+    await dbReplace([],defaults(),{});resetDone=true;
+    let legacyRemoved=true;try{localStorage.removeItem(STORE_KEY)}catch{legacyRemoved=false}
+    normaliseState(defaults());aiCache.clear();aiPending.clear();queryPlans.clear();askOpen=false;askText='';askError='';askResult=null;insightsError='';
+    models=null;modelQuery='';modelMsg='';testMsg='';showKey=false;backupText='';categoryDraft='';categoryConfirm='';categoryFeedback='';mergeChoice={};
+    draft={name:'',amt:'',date:today(),unknown:false};capErr='';homeMetric='month';receiptPeriod='current';receiptFrom=cycleBounds().first;receiptTo=cycleBounds().last;receiptFilter='all';receiptAfter=null;receiptTrail=[];
+    DATA={month:{spent:0},todaySpent:0,todayEntries:[],recent:[],review:[],reviewCount:0,overview:null,analytics:null,latestReview:null,receipt:[],receiptSummary:{spent:0,count:0},receiptNext:null,receiptMore:false,receiptPage:1};visible.clear();
+    clearTimeout(toastTimer);$('toast-root').replaceChildren();eraseState=null;prefsPage='';await refreshView();
+    toast(legacyRemoved?'Ledger data erased on this device.':'Ledger reset. An older local backup could not be removed.');
+  }catch(e){if(!resetDone&&eraseState===state)state.error=e.message;else toast('Ledger was reset; reopen the app to refresh.')}
+  finally{eraseBusy=false;main.inert=false;if(tabs)tabs.inert=false;render();window.scrollTo(0,0)}
+}
+
 const ACT={
+  "prefs-page":el=>openPrefsPage(el.dataset.page),
+  "prefs-back":()=>prefsBack(),
+  "prefs-erase":()=>openErasePage(),
+  "erase-confirm":()=>eraseConfirmed(),
   "ask-toggle":()=>{askOpen=!askOpen;render()},
   "ask-run":()=>askLedger(),
   "insight-run":()=>generateInsights(),
@@ -1563,10 +1666,10 @@ const ACT={
     catch{modelMsg=framed?"The preview blocks outside requests. Use your self-hosted copy.":"Couldn't load the list. Check your connection."}
     render()},
   "pick-model":el=>{S.settings.model=el.dataset.id;testMsg="";persist();render()},
-  test:async()=>{testMsg="Testing…";render();const t0=performance.now();
+  test:async()=>{if(testBusy||eraseBusy)return;testBusy=true;testMsg="Testing…";render();const t0=performance.now();
     try{const r=await classifyRemote("MTR");testMsg=`Connected. "MTR" is ${r.category||"Review"}, ${Math.round(performance.now()-t0)} ms.`;S.ai.lastError=""}
     catch(err){testMsg=err.message;if(err.status===403)S.settings.model=""}
-    persist();render()},
+    testBusy=false;persist();render();updateEraseButton()},
   "reset-usage":()=>{S.ai.requests=0;S.ai.cost=0;persist();render()},
   forget:el=>{delete S.dict[el.dataset.k];persist();render()},
   "copy-backup":async()=>{try{const txt=await backupJSON();await navigator.clipboard.writeText(txt);backupText="";render();toast("Backup copied.")}
@@ -1574,21 +1677,22 @@ const ACT={
   "download-backup":async()=>{if(framed){toast("Downloads are blocked in preview. Use Copy backup.");return}
     try{saveDownload(await backupJSON(),`pocket-ledger-${today()}.json`,"application/json");toast("Backup prepared.")}
     catch(err){toast("Backup failed: "+err.message)}},
-  erase:async()=>{if(!armed.erase){armed.erase=true;render();setTimeout(()=>{armed.erase=false;if(view==="prefs")render()},4000);return}
-    armed.erase=false;try{await dbReplace([],defaults(),{});try{localStorage.removeItem(STORE_KEY)}catch{}normaliseState(defaults());await refreshView();toast("All ledger data erased.")}
-    catch(err){toast("Could not erase: "+err.message)}}
+
 };
 
-$("main").addEventListener("click",e=>{const el=e.target.closest("[data-act]");if(!el)return;e.preventDefault();ACT[el.dataset.act]?.(el)});
+$("main").addEventListener("click",e=>{const el=e.target.closest("[data-act]");if(!el||eraseBusy)return;e.preventDefault();ACT[el.dataset.act]?.(el)});
 $("main").addEventListener("submit",e=>{e.preventDefault();if(e.target.id==="cap")saveCapture()});
 $("main").addEventListener("keydown",e=>{if(e.key!=="Enter"||e.target.id!=="cap-name")return;e.preventDefault();
   if(draft.amt.trim()||/\d$/.test(draft.name.trim()))saveCapture();else $("cap-amt")?.focus()});
 $("main").addEventListener("input",e=>{const t=e.target,d=t.dataset;
+  if(t.id==="erase-phrase"&&eraseState){eraseState.phrase=t.value;updateEraseButton();return}
   if(t.hasAttribute("data-ledger-question")){askText=t.value;return}
   if(d.draft&&d.draft!=="date"){draft[d.draft]=t.value;if(capErr){capErr="";t.closest("form")?.querySelector(".err")?.replaceChildren()}}
   else if(d.mq){modelQuery=t.value;const results=document.querySelector(".models");if(results)results.innerHTML=modelOptionsHTML()}
   else if(d.set&&t.type!=="checkbox"){S.settings[d.set]=d.set==="currency"?safeCurrency(t.value):d.set==="model"||d.set==="key"?t.value.trim():t.value;testMsg="";persist()}});
 $("main").addEventListener("change",e=>{const t=e.target,d=t.dataset;
+  if(t.id==="erase-ack"&&eraseState){eraseState.confirmed=t.checked;updateEraseButton();return}
+  if(d.insightLanguage&&Object.hasOwn(INSIGHT_LANGUAGES,t.value)){S.settings.insightLanguage=t.value;insightsError="";persist();render();return}
   if(d.draft==="date"){draft.date=t.value||today();render()}
   else if(d.cycle){const n=Number(t.value);if(validCycleStart(n)){S.settings.cycleStart=n;awaitPersistAndRefresh()}else render();toast(`Financial month now starts on day ${S.settings.cycleStart}.`)}
   else if(d.num){const v=parseMoney(t.value);if(v!=null){S.settings[d.num]=v;persist()}render()}
@@ -1598,7 +1702,7 @@ $("main").addEventListener("change",e=>{const t=e.target,d=t.dataset;
   else if(d.period){receiptPeriod=t.value;receiptAfter=null;receiptTrail=[];refreshView()}
   else if(d.range){if(d.range==="from")receiptFrom=t.value;else receiptTo=t.value;
     if(validDate(receiptFrom)&&validDate(receiptTo)&&receiptFrom<=receiptTo){receiptAfter=null;receiptTrail=[];refreshView()}}
-  else if(t.id==="p-import"&&t.files?.[0]){const mode=$("p-import-mode")?.value||"merge";t.files[0].text().then(txt=>importData(txt,mode)).catch(err=>toast(err.message));t.value=""}});
+  else if(t.id==="p-import"&&t.files?.[0]&&!importBusy&&!eraseBusy){const mode=$("p-import-mode")?.value||"merge";importBusy=true;t.files[0].text().then(txt=>importData(txt,mode)).catch(err=>toast(err.message)).finally(()=>{importBusy=false;updateEraseButton()});t.value=""}});
 async function awaitPersistAndRefresh(){try{await persist();await refreshView()}catch(err){toast("Could not save financial month: "+err.message)}}
 $("sheet-root").addEventListener("click",async e=>{
   if(e.target.classList.contains("scrim")){if(!sheet?.smart?.saving)closeSheet();return}
