@@ -819,8 +819,8 @@ async function refreshView({preservePage=false}={}){
     }else if(view==="overview"){
       const [monthly,analytics]=await Promise.all([dbSummary(m.first,m.last),overviewAnalytics(m,t)]);result={month:monthly,overview:monthly,analytics};records=[]
     }else if(view==="review"){
-      const rows=await dbByStatuses(["none","review","proposal","ai"]);
-      result={review:rows,reviewCount:rows.length};records=rows
+      const [rows,latestReview]=await Promise.all([dbByStatuses(["none","review","proposal","ai"]),loadSmartReview(t)]);
+      result={review:rows,reviewCount:rows.length,latestReview};records=rows
     }else if(view==="receipt"){
       const {from,to}=receiptBounds();if(from>to)throw new Error("The start date must be before the end date.");
       const [summary,pageRows,reviews]=await Promise.all([dbSummary(from,to),dbRange({from,to,limit:RECEIPT_PAGE_SIZE,after:receiptAfter,filter:receiptFilter}),dbCountStatuses(["none","review","proposal","ai"])]);
@@ -1329,7 +1329,7 @@ async function exportCSV(){
 /* Actions */
 /* Optional intelligence. Money and query execution stay on the device. */
 let askOpen=false,askText='',askBusy=false,askError='',askResult=null,queryPlans=new Map();
-let insightsBusy=false,insightsError='',reviewBusy=false,reviewResult=null,reviewError='';
+let insightsBusy=false,insightsError='';
 const daysBetween=(a,b)=>Math.round((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/86400000)+1;
 const aiDate=d=>validDate(d)&&d>='1900-01-01'&&d<=today();
 const aiMark='<svg class="smart-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 14.4 9.6 21.5 12 14.4 14.4 12 21.5 9.6 14.4 2.5 12 9.6 9.6Z"/></svg>';
@@ -1479,14 +1479,18 @@ function reviewChecks(rows){const dup=new Map(),names=new Map(),result=[];const 
   const pairs=new Set();for(const name of S.customCategories){for(const other of relatedCategories(name)){if(other===name)continue;const key=JSON.stringify([name,other].sort());if(pairs.has(key))continue;pairs.add(key);add("Similar categories",`${name} and ${other} may overlap. Review them in Settings.`,[])}}
   return result;
 }
-async function smartReview(){if(reviewBusy)return;reviewBusy=true;reviewError='';reviewResult=null;render();try{const to=today(),from=addDays(to,-89),rows=await dbRange({from,to});reviewResult={from,to,checks:reviewChecks(rows.entries),count:rows.entries.length}}catch(e){reviewError=e.message}finally{reviewBusy=false;render()}}
-function smartReviewHTML(){const r=reviewResult;return `<section class="sec"><h3><span>${aiMark} Smart review</span><button class="link ink" data-act="smart-review" ${reviewBusy?'disabled':''}>${reviewBusy?'Checking…':'Check records'}</button></h3><p class="note">Check the past 90 days for possible duplicates, unusual amounts, inconsistent or similar categories and recurring payments. Runs locally; no automatic changes.</p>${reviewError?`<p class="err">${esc(reviewError)}</p>`:''}${r?`<p class="note">Checked ${r.count} entries · ${esc(r.from)} to ${esc(r.to)} · run again after editing.</p>${r.checks.length?r.checks.map(x=>`<div class="smart-result"><strong>${esc(x.kind)}</strong><p class="note">${esc(x.message)}</p>${x.entries.map(e=>`<button class="row" data-act="edit" data-id="${esc(e.id)}"><span class="nm">${esc(e.name)}</span><span class="meta">${esc(e.date)}</span><span class="v">${money(e.amount)}</span></button>`).join('')}</div>`).join(''):'<p class="empty">No obvious patterns to review.</p>'}`:''}</section>`}
+async function loadSmartReview(to=today()){
+  const from=addDays(to,-89);
+  try{const rows=await dbRange({from,to});return {from,to,checks:reviewChecks(rows.entries),count:rows.entries.length,checkedAt:new Date().toISOString()}}
+  catch(e){return {from,to,error:'Could not check records. Reopen Review or try refreshing.'}}
+}
+function smartReviewHTML(){const r=DATA.latestReview;return `<section class="sec"><h3><span>Smart review</span><button class="link" data-act="smart-review" aria-label="Refresh smart review">Refresh</button></h3>${r?.error?`<p class="err" role="status">${esc(r.error)}</p>`:r?`<p class="note">Automatically checked ${r.count} entries · Last 90 days · ${esc(new Date(r.checkedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}))}</p>${r.checks.length?r.checks.map(x=>`<div class="smart-result"><strong>${esc(x.kind)}</strong><p class="note">${esc(x.message)}</p>${x.entries.map(e=>`<button class="row" data-act="edit" data-id="${esc(e.id)}"><span class="nm">${esc(e.name)}</span><span class="meta">${esc(e.date)}</span><span class="v">${money(e.amount)}</span></button>`).join('')}</div>`).join(''):r.count?'<p class="empty">No obvious patterns to review.</p>':'<p class="empty">No recent records to check.</p>'}`:'<p class="note">Checking recent records…</p>'}<p class="note">Runs on this device. No records are changed automatically.</p></section>`}
 
 const ACT={
   "ask-toggle":()=>{askOpen=!askOpen;render()},
   "ask-run":()=>askLedger(),
   "insight-run":()=>generateInsights(),
-  "smart-review":()=>smartReview(),
+  "smart-review":()=>refreshView(),
   "toggle-spending":()=>{homeMetric=homeMetric==="month"?"today":"month";render()},
   "toggle-unknown":()=>{draft.unknown=!draft.unknown;capErr="";render();(draft.unknown?$("cap-amt"):$("cap-name"))?.focus()},
   pick:el=>{draft.name=el.dataset.label;draft.unknown=false;render();$("cap-amt")?.focus()},
