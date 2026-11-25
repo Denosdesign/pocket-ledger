@@ -1518,58 +1518,80 @@ function forecastFor(m,ref,current,history){const elapsed=daysBetween(m.first,re
   if(elapsed>=3&&current.count>=3)return {amount:Math.round(current.spent+Math.max(0,current.spent/elapsed)*remaining),method:'Based on recorded spending so far and the remaining calendar days.'};
   return null;
 }
-async function overviewAnalytics(m,ref){const old=cycleBounds(addDays(m.first,-1)),elapsed=daysBetween(m.first,ref),oldTo=[addDays(old.first,elapsed-1),old.last].sort()[0];
-  const [current,previous,history]=await Promise.all([dbSummary(m.first,ref),dbSummary(old.first,oldTo),dbRange({from:addDays(m.first,-56),to:addDays(m.first,-1)})]);
-  const forecast=forecastFor(m,ref,current,history.entries),comparable=daysBetween(m.first,ref)===daysBetween(old.first,oldTo)&&previous.count>0;
-  return {from:m.first,to:ref,previousFrom:old.first,previousTo:oldTo,current,previous,comparable,forecast};
+// Use bounded local history windows, never transaction labels or individual records in the AI payload.
+function insightWindow(rows,from,to){
+  const dates=new Set(),categoryTotals=Object.create(null);let spending=0;
+  for(const e of rows){if(e.date<from||e.date>to||!SPEND.has(e.type))continue;spending+=e.amount;
+    if(e.type==='purchase'||e.type==='unknown')dates.add(e.date);
+    if(e.type==='purchase'&&e.category)categoryTotals[e.category]=(categoryTotals[e.category]||0)+e.amount;
+  }
+  const days=daysBetween(from,to);
+  return {from,to,days,spending,recordedDays:dates.size,categoryTotals,
+    enoughEvidence:days>=3&&dates.size>=Math.max(3,Math.ceil(days/2))};
+}
+async function overviewAnalytics(m,ref){
+  const old=cycleBounds(addDays(m.first,-1)),elapsed=daysBetween(m.first,ref),oldTo=[addDays(old.first,elapsed-1),old.last].sort()[0];
+  const completed=[];let boundary=m.first;
+  for(let i=0;i<3;i++){const cycle=cycleBounds(addDays(boundary,-1));completed.push(cycle);boundary=cycle.first}
+  const historyFrom=[completed[2].first,addDays(m.first,-56),addDays(ref,-14)].sort()[0];
+  const [current,previous,history]=await Promise.all([dbSummary(m.first,ref),dbSummary(old.first,oldTo),dbRange({from:historyFrom,to:ref})]);
+  const rows=history.entries;
+  const forecast=forecastFor(m,ref,current,rows.filter(e=>e.date>=addDays(m.first,-56)&&e.date<m.first));
+  const comparable=elapsed===daysBetween(old.first,oldTo)&&previous.count>0;
+  const recent=insightWindow(rows,addDays(ref,-7),addDays(ref,-1)),beforeRecent=insightWindow(rows,addDays(ref,-14),addDays(ref,-8));
+  const currentWindow=insightWindow(rows,m.first,ref),previousWindow=insightWindow(rows,old.first,oldTo);
+  const completedWindows=completed.map(period=>insightWindow(rows,period.first,period.last));
+  return {from:m.first,to:ref,previousFrom:old.first,previousTo:oldTo,current,previous,comparable,forecast,
+    horizons:{recent,beforeRecent,currentWindow,previousWindow,completedWindows}};
 }
 function insightPayload(a){
-  // Compute all financial metrics locally; only aggregates and formatted currency leave the device.
-  const pct=(n,d)=>d>0?Math.round(n/d*100):null;
-  const m=cycleBounds(a.to),elapsed=daysBetween(a.from,a.to),totalDays=daysBetween(a.from,m.last),daysLeft=Math.max(1,daysBetween(a.to,m.last));
-  const current=a.current,budget=S.settings.budget||0,remaining=budget-current.spent,average=Math.round(current.spent/Math.max(1,elapsed));
-  const dailyAllowance=budget>0?Math.floor(Math.max(0,remaining)/daysLeft):null;
-  const summary=(s,from,to)=>({from,to,total_spending:money(s.spent),entry_count:s.count,purchase_count:s.entriesCount||0,
-    days_with_named_purchases:Object.keys(s.purchaseDays||{}).length,
-    categories:Object.entries(s.categories||{}).sort((x,y)=>y[1]-x[1]).map(([category,amount])=>({category,spending:money(amount)})),
-    unnamed_spending:money(s.unknown||0),adjustments:money(s.adjustments||0)});
-  const categories=Object.entries(current.categories||{}).sort((x,y)=>y[1]-x[1]);
-  const drivers=categories.slice(0,6).map(([category,amount])=>{
-    const pattern=current.categoryPatterns?.[category];
-    return {category,spending:money(amount),share_of_named_purchase_spending_percentage:pct(amount,current.grossPurchases||0),
-      purchase_count:pattern?.count??null,average_purchase:pattern&&pattern.count>=2?money(Math.round(amount/pattern.count)):null,
-      largest_purchase_share_of_category_percentage:pattern&&pattern.count>=2?pct(pattern.largest,amount):null};
-  });
-  const comparison=a.comparable?{previous:summary(a.previous,a.previousFrom,a.previousTo),change_in_spending:money(current.spent-a.previous.spent,{sign:true}),
-    percentage_change:pct(current.spent-a.previous.spent,a.previous.spent),
-    category_changes:[...new Set([...Object.keys(current.categories||{}),...Object.keys(a.previous.categories||{})])].map(category=>{
-      const now=current.categories[category]||0,prev=a.previous.categories[category]||0;
-      return {category,current:money(now),previous:money(prev),change:money(now-prev,{sign:true}),magnitude:Math.abs(now-prev),direction:now>prev?'increased':now<prev?'decreased':'unchanged'};
-    }).filter(x=>x.magnitude>0).sort((x,y)=>y.magnitude-x.magnitude).slice(0,5).map(({magnitude,...x})=>x)}:null;
-  const forecast=a.forecast?{estimated_full_financial_month_spending:money(a.forecast.amount),method:a.forecast.method,
-    budget_status:budget>0?(a.forecast.amount>budget?'above budget':a.forecast.amount<budget?'within budget':'on budget'):'no budget set',
-    difference_from_budget:budget>0?money(a.forecast.amount-budget,{sign:true}):null}:null;
-  const pacing=budget>0?{financial_month_budget:money(budget),budget_remaining:money(remaining),budget_used_percentage:pct(current.spent,budget),
-    elapsed_period_percentage:pct(elapsed,totalDays),pace_gap_percentage_points:pct(current.spent,budget)-pct(elapsed,totalDays),
-    recorded_average_per_elapsed_calendar_day:money(average),planned_average_per_calendar_day:money(Math.floor(budget/totalDays)),
-    spending_above_or_below_even_budget_pace:money(current.spent-Math.round(budget*elapsed/totalDays),{sign:true}),
-    remaining_daily_allowance_including_today:money(dailyAllowance),
-    next_seven_days_allowance:daysLeft>=7?money(dailyAllowance*7):null,
-    required_reduction_from_recorded_daily_average_percentage:remaining>=0&&average>0?Math.max(0,pct(average-dailyAllowance,average)):null,
-    already_over_budget:remaining<0}:null;
-  const days=Object.values(current.purchaseDays||{});
-  return {currency:S.settings.currency,period_type:'current financial month to date, not a calendar week',financial_month_end:m.last,
-    elapsed_calendar_days_including_today:elapsed,total_calendar_days:totalDays,remaining_calendar_days_including_today:daysLeft,
-    current:summary(current,a.from,a.to),pacing,drivers,comparable:a.comparable,comparison,forecast,
-    concentration:{named_purchase_days:days.length,largest_day_share_of_named_purchase_spending_percentage:days.length>=2?pct(Math.max(...days),current.grossPurchases||0):null,
-      named_purchase_total:money(current.grossPurchases||0)},coverage_note:'Only recorded expenses are known. Missing entries, future bills and essential versus optional purchases are not known. Today may be incomplete.'};
+  const pct=(n,d)=>d>0?Math.round(n/d*100):null,m=cycleBounds(a.to);
+  const elapsed=daysBetween(a.from,a.to),totalDays=daysBetween(a.from,m.last),daysLeft=Math.max(1,daysBetween(a.to,m.last));
+  const budget=S.settings.budget||0,remaining=budget-a.current.spent,allowance=Math.floor(Math.max(0,remaining)/daysLeft);
+  const h=a.horizons;
+  const windowSummary=w=>({from:w.from,to:w.to,calendar_days:w.days,days_with_recorded_spending:w.recordedDays,
+    recorded_total:money(w.spending),recorded_daily_average:money(Math.round(w.spending/w.days))});
+  const comparison=(now,prev)=>now?.enoughEvidence&&prev?.enoughEvidence&&now.days===prev.days?
+    {current:windowSummary(now),previous:windowSummary(prev),change:money(now.spending-prev.spending,{sign:true}),percentage_change:pct(now.spending-prev.spending,prev.spending)}:null;
+  const shortTerm=h?comparison(h.recent,h.beforeRecent):null;
+  const mediumTerm=h&&a.comparable?comparison(h.currentWindow,h.previousWindow):null;
+  const longTerm=h?.completedWindows?.slice(0,3)||[];
+  // Keep historical periods contiguous: do not skip sparse months and call the remaining ones consecutive.
+  const reliableMonths=[];for(const w of longTerm){if(!w.enoughEvidence)break;reliableMonths.push(w)}
+  const longContext=reliableMonths.length>=2?{completed_financial_months:reliableMonths.map(windowSummary),note:'Most recent first. Past budget settings and completeness are unknown.'}:null;
+  // Only persistent category changes across three observed completed months are eligible as context.
+  // No current category ranking, per-entry count, average ticket, individual purchase, or inferred spending purpose.
+  const trends=[];
+  if(reliableMonths.length===3){
+    const [latest,middle,oldest]=reliableMonths;
+    for(const cat of Object.keys(latest.categoryTotals).sort()){
+      const amounts=[latest,middle,oldest].map(w=>w.categoryTotals[cat]||0);
+      if(amounts.some(x=>x<=0))continue;
+      const rates=amounts.map((x,i)=>x/reliableMonths[i].days);
+      const change=pct(rates[0]-rates[2],rates[2]);
+      if(change!==null&&Math.abs(change)>=20&&((rates[0]>rates[1]&&rates[1]>rates[2])||(rates[0]<rates[1]&&rates[1]<rates[2]))){
+        trends.push({category:cat,recorded_daily_average_change_percentage:change,
+          monthly_recorded_totals:amounts.map(x=>money(x)),note:'Recorded spending changed across three completed financial months; reason, necessity and purchase coverage period are unknown.'});
+      }
+    }
+  }
+  const pacing=budget>0?{financial_month_budget:money(budget),budget_remaining:money(remaining),budget_used_percentage:pct(a.current.spent,budget),
+    elapsed_calendar_day_percentage:pct(elapsed,totalDays),remaining_daily_allowance_including_today:money(allowance),
+    next_seven_days_allowance_including_today:daysLeft>=7&&remaining>=0?money(allowance*7):null,already_over_budget:remaining<0}:null;
+  const forecast=a.forecast&&a.forecast.method.startsWith('Based on the previous eight weeks')?
+    {estimated_full_financial_month_spending:money(a.forecast.amount),method:a.forecast.method,uncertain:true}:null;
+  return {currency:S.settings.currency,current_financial_month:{from:a.from,as_of:a.to,end:m.last,elapsed_calendar_days_including_today:elapsed,
+    remaining_calendar_days_including_today:daysLeft,total_calendar_days:totalDays,recorded_spending:money(a.current.spent),days_with_recorded_spending:h?.currentWindow.recordedDays??null},
+    budget_position:pacing,short_term_completed_seven_day_comparison:shortTerm,medium_term_same_elapsed_financial_month_comparison:mediumTerm,
+    longer_term_completed_months:longContext,optional_persistent_category_trends:trends.slice(0,6),historical_forecast:forecast,
+    interpretation:'Amounts represent recorded cash outflow or ledger adjustments, not consumption per meal, journey or day of use. No transaction purpose, prepaid balance, useful lifetime, future bills or essential versus optional split is known. Zero or absent entries do not prove zero spending. Recording-day coverage is only a rough evidence screen, not proof of completeness. Today is incomplete. Current budget applies to the current financial month only. Null comparisons mean insufficient comparable evidence; do not speculate.'};
 }
-const insightKey=a=>JSON.stringify(['insights-actionable-v5',S.settings.insightLanguage,S.settings.model,insightPayload(a)]);
+const insightKey=a=>JSON.stringify(['insights-context-v6',S.settings.insightLanguage,S.settings.model,insightPayload(a)]);
 function insightsHTML(){const a=DATA.analytics;if(!a)return '';const p=a.previous,c=a.current,diff=c.spent-p.spent,percent=a.comparable&&p.spent>0?Math.round(diff/p.spent*100):null;
   const cache=S.insightCache,hit=cache&&cache.key===insightKey(a)&&typeof cache.text==='string';const top=Object.entries(c.categories).sort((x,y)=>y[1]-x[1])[0];
   return `<section class="sec"><h3><span>Spending forecast</span><span>Estimate</span></h3>${a.forecast?`<strong class="smart-number">${money(a.forecast.amount)}</strong><p class="note">${esc(a.forecast.method)} ${a.forecast.amount>S.settings.budget?'Above your current budget.':'Within your current budget.'} Assumes entries are complete; excludes unknown future bills.</p>`:'<p class="note">Not enough recorded spending yet for a useful estimate.</p>'}</section><section class="sec"><h3><span>${aiMark} Spending insights</span><button type="button" class="link ink" data-act="insight-run" ${insightsBusy||!c.count?'disabled':''}>${insightsBusy?'Generating…':hit?'Regenerate':'Generate insights'}</button></h3>${a.comparable?`<div class="line"><span>Same elapsed period last month<small>${esc(a.previousFrom)} to ${esc(a.previousTo)}</small></span><strong>${money(p.spent)}</strong></div><div class="line"><span>Recorded this month<small>${esc(a.from)} to ${esc(a.to)}</small></span><strong>${money(c.spent)}</strong></div><p class="note">${money(diff,{sign:true})}${percent!==null?' · '+Math.abs(percent)+'% '+(percent>0?'higher':percent<0?'lower':'change'):''}</p>`:'<p class="note">No comparable prior period with entries yet.</p>'}${top?`<p class="note">Largest category so far: ${esc(top[0])} · ${money(top[1])}.</p>`:''}<p class="note">AI receives only these aggregated figures, not receipt names or individual transactions.</p>${hit?`<div class="smart-result"><p class="smart-report">${esc(cache.text)}</p><p class="note">Saved insight · ${esc(cache.date||'')}</p></div>`:''}${insightsError?`<p class="err" role="status">${esc(insightsError)}</p>`:''}</section>`
 }
-async function generateInsights(){const a=DATA.analytics;if(!a||insightsBusy||!a.current.count)return;const key=insightKey(a);insightsBusy=true;insightsError='';render();try{const j=await smartRemote('Act as a practical personal budgeting companion, not a report summariser. '+INSIGHT_LANGUAGES[S.settings.insightLanguage].guide+' Use two or three short plain text paragraphs. Give the most useful decisions for the remaining financial month, not a list of totals already visible. First, assess urgency using the gap between budget used and time elapsed, and give the actual remaining daily allowance including today if a budget exists. If already over budget, say so and focus on limiting further overspend, not a zero daily target as a realistic living budget. Second, explain the most meaningful spending driver using transaction frequency, concentration or a comparable category change when supported; distinguish a single purchase from repeated purchases but never assume a large payment is exceptional or optional. Where only one or two days or a few purchases exist, say the pattern is tentative. Third, offer a specific, achievable adjustment for the next few days, such as a suggested spending envelope or delaying further discretionary purchases if appropriate; use the supplied daily or seven-day allowance and required reduction only when relevant. Preserve room for essentials and do not tell the user to reduce necessary transport or health spending. If the budget is unrealistic, explain the tension rather than shame the user. Use a warm, matter-of-fact and respectful tone in the selected language. Recognise genuine progress or a useful behaviour only when the supplied evidence supports it: for example, improved budget pacing, lower comparable spending, or a category whose recorded spending is under better control. Explain why that specific observation matters and what is worth maintaining. When spending is above plan, frame the remaining choices constructively: the budget is a planning tool, not a judgement of personal worth. Do not minimise the size of an overspend or pretend an impractical allowance is achievable. If there is no evidence of progress, offer a realistic next step without forced praise. Do not infer discipline, consistent logging, improved habits or emotional state from incomplete records. Avoid generic cheerleading, congratulations, motivational slogans, exaggerated reassurance, exclamation marks and a compulsory closing compliment. Integrate any encouragement naturally into the analysis, using at most one brief sentence of explicit encouragement where useful. If comfortably on pace, explain what is working and avoid unnecessary austerity. Use prior comparisons only if comparable is true. Forecast is uncertain, especially when a small number of large payments drives current pace. Do not claim future expenses or logging completeness are known. All monetary figures are preformatted in the actual currency: reproduce them exactly and use only supplied figures and percentages. Never calculate, convert, multiply, divide, invent or round figures. The period is the financial month to date, not a week. Use only the most relevant evidence, do not repeat every number, do not give generic advice such as review spending without a concrete next step. No headings, JSON, tables, preambles or investment advice.',insightPayload(a),'text');S.insightCache={key,text:j,date:today()};await persist()}catch(e){insightsError=e.message}finally{insightsBusy=false;render()}}
+async function generateInsights(){const a=DATA.analytics;if(!a||insightsBusy||!a.current.count)return;const key=insightKey(a);insightsBusy=true;insightsError='';render();try{const j=await smartRemote('Act as a thoughtful personal budgeting companion, not a financial report narrator or spending police. '+INSIGHT_LANGUAGES[S.settings.insightLanguage].guide+' Return two or three short plain text paragraphs. Start with the present budget position when relevant: remaining money and remaining daily allowance are mathematical planning references, not mandatory daily limits or an assessment of affordability. If the allowance is tight, distinguish the arithmetic from the unknown reality of upcoming expenses; suggest checking what still needs to be paid, or adjusting the plan if needed. Do not prescribe category caps, alternative transport, cash envelopes, blanket shopping bans or reductions in essentials. Do not assume a budget is unrealistic, that a purchase is optional, or that higher outflow means a bad habit. Money recorded today may fund consumption over weeks or months, for example a transport top-up; never infer meals, journeys, unit costs, payment purpose, recurrence, useful life or whether a purchase is one-off from category names, dates or numbers of records. Do not invent a main spending culprit. Consider short-term, current financial month and completed-month evidence separately. Use comparisons only when explicitly supplied; do not extrapolate a few days into a long-term behaviour. If comparisons are unavailable, state that the evidence cannot establish a trend, and focus on a practical decision instead. Optional persistent category trends may be mentioned only when they add genuinely useful context, as changes in recorded outflow, not evidence of excessive consumption or a cause. Never list categories for the sake of analysis. A historically informed forecast is an uncertain scenario, not an inevitable outcome; do not project the early spending rate forward yourself. Give one specific but conditional next step that is relevant to the evidence, such as checking which upcoming essential payments remain before choosing how much of the remaining budget to reserve. Where a positive pattern is supported, acknowledge it naturally without forced encouragement; never claim improved discipline or savings from incomplete data. Do not praise or criticise specific categories. All money and percentages are computed locally. Copy any figures exactly, including currency, and do not calculate, convert, round, invent or reinterpret units. No headings, tables, JSON, preambles, generic pep talk or investment advice.',insightPayload(a),'text');S.insightCache={key,text:j,date:today()};await persist()}catch(e){insightsError=e.message}finally{insightsBusy=false;render()}}
 /* Smart Review: bounded local checks, no automated edits or API requests. */
 function reviewChecks(rows){const dup=new Map(),names=new Map(),result=[];const add=(kind,message,entries)=>{if(result.length<30)result.push({kind,message,entries:entries.slice(0,5)})};
   for(const e of rows){if(e.type!=='purchase')continue;const n=norm(e.name);if(!n)continue;const k=JSON.stringify([n,e.date,e.amount]);if(!dup.has(k))dup.set(k,[]);dup.get(k).push(e);if(!names.has(n))names.set(n,[]);names.get(n).push(e)}
