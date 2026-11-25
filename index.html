@@ -1339,7 +1339,20 @@ function parseSmartJSON(raw){
   if(!result||typeof result!=='object'||Array.isArray(result))throw Error('The AI reply did not contain the expected information. Try again.');
   return result;
 }
-async function smartRemote(instruction,payload,maxTokens){
+function parseInsightText(raw){
+  const clean=raw.trim().replace(/^\uFEFF/,'');
+  const fenced=clean.match(/^```(?:json|text|markdown)?\s*([\s\S]*?)\s*```$/i);
+  const body=(fenced?fenced[1]:clean).trim();
+  let value=body;
+  if(/^[\[{""]/.test(body)){
+    try{value=JSON.parse(body)}catch{throw Error('The insight was incomplete. Please try again.')}
+  }
+  if(value&&typeof value==='object'&&!Array.isArray(value))value=value.text??value.insights??value.observations;
+  if(Array.isArray(value)&&value.every(x=>typeof x==='string'))value=value.join('\n\n');
+  if(typeof value!=='string'||!value.trim()||value.length>4000)throw Error('The model did not return a readable spending report. Try again or select another model in Settings.');
+  return value.trim();
+}
+async function smartRemote(instruction,payload,maxTokens,format='json'){
   if(!aiReady())throw Error('Enable AI and choose a model in Settings first.');
   if(!navigator.onLine)throw Error('You are offline. Manual entry still works.');
   const model=S.settings.model,key=S.settings.key;if(/anthropic|claude/i.test(model))throw Error('Choose a supported non Anthropic model.');
@@ -1349,9 +1362,9 @@ async function smartRemote(instruction,payload,maxTokens){
     let data;try{data=await res.json()}catch{throw Error(res.ok?'The AI service returned an unreadable reply. Please try again.':httpMsg(res.status,''))}if(!res.ok)throw Error(httpMsg(res.status,data?.error?.message||''));
     S.ai.requests++;if(Number.isFinite(data?.usage?.cost))S.ai.cost+=data.usage.cost;await persist().catch(()=>{});
     const choice=data?.choices?.[0],raw=choice?.message?.content;
-    if(choice?.finish_reason==='length')throw Error('The AI reply was cut short. Try a shorter list, or split it into batches.');
+    if(choice?.finish_reason==='length')throw Error(format==='text'?'The model ran out of response space. Please try again or choose another model in Settings.':'The AI reply was cut short. Try a shorter list, or split it into batches.');
     if(typeof raw!=='string'||!raw.trim())throw Error('The model returned no usable reply. Try again or use manual entry.');
-    return parseSmartJSON(raw);
+    return format==='text'?parseInsightText(raw):parseSmartJSON(raw);
   }catch(e){if(e.name==='AbortError')throw Error('The model timed out. Please try again.');throw e}finally{clearTimeout(timer)}
 }
 /* Smart Capture: strict local parsing first, then optional explicit AI parsing. */
@@ -1453,7 +1466,7 @@ function insightsHTML(){const a=DATA.analytics;if(!a)return '';const p=a.previou
   const cache=S.insightCache,hit=cache&&cache.key===insightKey(a)&&typeof cache.text==='string';const top=Object.entries(c.categories).sort((x,y)=>y[1]-x[1])[0];
   return `<section class="sec"><h3><span>Spending forecast</span><span>Estimate</span></h3>${a.forecast?`<strong class="smart-number">${money(a.forecast.amount)}</strong><p class="note">${esc(a.forecast.method)} ${a.forecast.amount>S.settings.budget?'Above your current budget.':'Within your current budget.'} Assumes entries are complete; excludes unknown future bills.</p>`:'<p class="note">Not enough recorded spending yet for a useful estimate.</p>'}</section><section class="sec"><h3><span>${aiMark} Spending insights</span></h3>${a.comparable?`<div class="line"><span>Same elapsed period last month<small>${esc(a.previousFrom)} to ${esc(a.previousTo)}</small></span><strong>${money(p.spent)}</strong></div><div class="line"><span>Recorded this month<small>${esc(a.from)} to ${esc(a.to)}</small></span><strong>${money(c.spent)}</strong></div><p class="note">${money(diff,{sign:true})}${percent!==null?' · '+Math.abs(percent)+'% '+(percent>0?'higher':percent<0?'lower':'change'):''}</p>`:'<p class="note">No comparable prior period with entries yet.</p>'}${top?`<p class="note">Largest category so far: ${esc(top[0])} · ${money(top[1])}.</p>`:''}<p class="note">AI receives only these aggregated figures, not receipt names or individual transactions.</p>${hit?`<div class="smart-result"><p class="smart-report">${esc(cache.text)}</p><p class="note">Saved insight · ${esc(cache.date||'')}</p></div>`:`<button class="link ink" data-act="insight-run" ${insightsBusy||!c.count?'disabled':''}>${insightsBusy?'Generating…':'Generate insights'}</button>`}${insightsError?`<p class="err" role="status">${esc(insightsError)}</p>`:''}</section>`
 }
-async function generateInsights(){const a=DATA.analytics;if(!a||insightsBusy||!a.current.count)return;const key=insightKey(a);if(S.insightCache?.key===key)return;insightsBusy=true;insightsError='';render();try{const j=await smartRemote('Write two or three short actionable spending observations in Traditional Chinese (Hong Kong) or English if appropriate. JSON {text:string}. Use only supplied aggregated facts. Amounts are integer minor units; convert correctly. Do not invent causes, trends or merchant names. Compare periods only if comparable true. Forecast is uncertain. Avoid advice that shames or diagnoses. Do not give investment advice.',insightPayload(a),350);if(typeof j.text!=='string'||!j.text.trim()||j.text.length>1600)throw Error('No usable insight returned.');S.insightCache={key,text:j.text.trim(),date:today()};await persist()}catch(e){insightsError=e.message}finally{insightsBusy=false;render()}}
+async function generateInsights(){const a=DATA.analytics;if(!a||insightsBusy||!a.current.count)return;const key=insightKey(a);if(S.insightCache?.key===key)return;insightsBusy=true;insightsError='';render();try{const j=await smartRemote('Write two or three short actionable spending observations in Traditional Chinese (Hong Kong). Return plain text only, with short paragraphs. Do not use JSON, code fences or markdown tables. Use only supplied aggregated facts. Amounts are integer minor units; convert correctly. Do not invent causes, trends or merchant names. Compare periods only if comparable true. Forecast is uncertain. Avoid advice that shames or diagnoses. Do not give investment advice.',insightPayload(a),700,'text');S.insightCache={key,text:j,date:today()};await persist()}catch(e){insightsError=e.message}finally{insightsBusy=false;render()}}
 /* Smart Review: bounded local checks, no automated edits or API requests. */
 function reviewChecks(rows){const dup=new Map(),names=new Map(),result=[];const add=(kind,message,entries)=>{if(result.length<30)result.push({kind,message,entries:entries.slice(0,5)})};
   for(const e of rows){if(e.type!=='purchase')continue;const n=norm(e.name);if(!n)continue;const k=JSON.stringify([n,e.date,e.amount]);if(!dup.has(k))dup.set(k,[]);dup.get(k).push(e);if(!names.has(n))names.set(n,[]);names.get(n).push(e)}
