@@ -540,6 +540,31 @@ input:not([type=checkbox]):not([type=radio]),select,textarea{font-size:max(16px,
 .ask-quick{margin:14px 0 8px}.ask-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.ask-chips button{border:1px solid var(--line);border-radius:999px;padding:8px 11px;min-height:36px;font-size:12px}.receipt-ask-panel .btn{min-height:44px;width:100%;margin-top:8px}
 
 .budget-target{margin:17px 0 4px;padding:14px 0 0;border-top:1px solid var(--line)}.budget-target-head{font-size:14px;gap:8px}.budget-target-head strong{font-size:14px;font-weight:500;text-align:right}.budget-target .meter{margin-top:9px}.budget-target-detail{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:12px;color:var(--muted)}.plan-split{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:13px}.plan-field small{font-size:11px;color:var(--muted);margin-left:6px}.plans-list{display:grid;gap:12px;margin-top:16px}.plan-card{border:1px solid var(--line);border-radius:15px;padding:14px}.plan-open{display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;border:0;background:transparent;color:var(--ink);padding:0;gap:12px}.plan-open strong,.plan-open small{display:block}.plan-open small{font-size:12px;color:var(--muted);margin-top:4px}.plan-open svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;flex:none}.plan-value{font-size:25px;font-weight:500;margin-top:14px;letter-spacing:-.025em}.plan-value small{font-size:14px;color:var(--muted);font-weight:400}.plan-card .link{margin-top:9px}.plan-scope{margin:20px 0}.plan-scope small{color:var(--muted)}#plan-name,#plan-target,#s-plan{font-size:16px}
+
+/* Compact spending hierarchy, separate from generic settings rows. */
+.spending-hero{padding-bottom:0}
+.spending-hero .hero-heading{align-items:center}
+.spending-hero .hero-title{font-size:clamp(35px,9vw,44px);line-height:1.05}
+.spending-hero .fig{margin-top:12px}
+.spending-hero .cycle-range{margin-top:6px;margin-bottom:0}
+.budget-target{margin:18px 0 0;padding:16px 0 0;border-top:1px solid var(--line)}
+.budget-target-head,.plan-split{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:14px;line-height:1.4}
+.budget-target-head strong,.plan-split strong{flex:none;font-weight:500;font-variant-numeric:tabular-nums}
+.budget-target-head span,.plan-split span{min-width:0;overflow-wrap:anywhere}
+.budget-target .meter{margin-top:9px;height:5px}
+.budget-target-detail{margin-top:7px;font-size:12px;line-height:1.4;flex-wrap:wrap}
+.budget-daily{margin:5px 0 0;font-size:12px;color:var(--muted)}
+.plan-split{border:0;margin-top:13px;padding:0;font-size:13px;color:var(--muted)}
+.plan-split strong{color:var(--ink)}
+.today-history{margin-top:30px}
+.row.ledger-row{grid-template-columns:minmax(0,1fr) auto;align-items:start;column-gap:12px}
+.ledger-description{min-width:0;display:flex;flex-direction:column;gap:4px}
+.ledger-description .nm{line-height:1.35}
+.ledger-description>.meta{line-height:1.35;overflow-wrap:anywhere}
+.ledger-row .v{white-space:nowrap;align-self:start;line-height:1.35;font-variant-numeric:tabular-nums}
+.receipt-stack .ledger-row{min-height:0;padding:12px 0}
+.receipt-stack .ledger-row .meta{font-size:11px}
+@media(max-width:340px){.budget-target-head,.plan-split{font-size:12px}.budget-target-detail{font-size:11px}.receipt-stack{padding-left:13px;padding-right:13px}}
 </style>
 </head>
 <body>
@@ -1105,27 +1130,27 @@ function metaOf(e){
   if(e.type==="unknown")return"Name unknown";if(e.type==="adjustment")return"Adjustment";if(e.type==="repayment")return"Repayment";
   if(e.status==="pending")return"Sorting…";if(e.status==="proposal")return`<span class="meta warn">New category suggested</span>`;if(needsReview(e))return`<span class="meta warn">Needs category</span>`;
   return e.category?esc(e.category)+(e.status==="ai"?" · Suggested":""):""}
-function rowHTML(e){const plan=planById(e.planId),m=metaOf(e)+(plan?' · '+esc(plan.name):'');
-  return `<button type="button" class="row ${e.type}" data-act="edit" data-id="${e.id}"><span class="nm">${esc(e.name)}</span><span class="meta">${m}</span><span class="v">${money(e.amount)}</span></button>`}
+function rowHTML(e){const plan=planById(e.planId),m=metaOf(e),detail=[m,plan?esc(plan.name):''].filter(Boolean).join(' · ');
+  return `<button type="button" class="row ledger-row ${e.type}" data-act="edit" data-id="${e.id}"><span class="ledger-description"><span class="nm">${esc(e.name)}</span>${detail?`<span class="meta">${detail}</span>`:''}</span><span class="v">${money(e.amount)}</span></button>`}
 function recentLabels(){const m=new Map();
   for(const e of DATA.recent){if(e.type!=="purchase")continue;const k=norm(e.name);if(!k)continue;const r=m.get(k);if(r)r.n++;else m.set(k,{label:e.name,n:1})}
   return [...m.values()].sort((a,b)=>b.n-a.n).slice(0,5)}
 
 function budgetTargetHTML(m,detail=false){const used=m.budget?Math.max(0,Math.min(100,m.everyday/m.budget*100)):0;
-  return `<div class="budget-target"><div class="line budget-target-head"><span>Everyday target</span><strong>${money(m.everyday)}${m.budget?' / '+money(m.budget):''}</strong></div>${m.budget?`<div class="meter"><i style="width:${used}%"></i></div><div class="budget-target-detail"><span>${m.left>=0?money(m.left)+' remaining':money(-m.left)+' above target'}</span>${detail&&m.left>0?'<span>About '+money(Math.floor(m.left/m.daysLeft))+' a day</span>':''}</div>`:'<p class="note">No target set</p>'}${m.separate!==0?`<div class="line plan-split"><span>Separate planned spending</span><strong>${money(m.separate)}</strong></div>`:''}</div>`
+  return `<div class="budget-target"><div class="budget-target-head"><span>Everyday spending</span><strong>${money(m.everyday)}</strong></div>${m.budget?`<div class="meter" role="img" aria-label="${esc(money(m.everyday)+' of '+money(m.budget)+' target')}"><i style="width:${used}%"></i></div><div class="budget-target-detail"><span>${m.left>=0?money(m.left)+' left':money(-m.left)+' above target'}</span><span>${money(m.budget)} target</span></div>${detail&&m.left>0?`<p class="budget-daily">About ${money(Math.floor(m.left/m.daysLeft))} a day</p>`:''}`:'<p class="budget-daily">No target set</p>'}${m.separate!==0?`<div class="plan-split"><span>Planned spending</span><strong>${money(m.separate)}</strong></div>`:''}</div>`
 }
 
 function viewToday(){const t=today(),tot=DATA.todaySpent,m=monthStats(),todays=DATA.todayEntries,rec=recentLabels();
-  const cumulative=homeMetric==="month",metricTitle=cumulative?"Total this financial month":"Today’s spending";
-  const nextTitle=cumulative?"Show today’s spending":"Show cumulative spending";
+  const cumulative=homeMetric==="month",metricTitle=cumulative?"This month":"Today";
+  const nextTitle=cumulative?"Show today’s spending":"Show this financial month’s spending";
   return `${masthead()}
-  <section class="hero" aria-label="${metricTitle}">
+  <section class="hero spending-hero" aria-label="${cumulative?"Total this financial month":"Today’s spending"}">
     <div class="hero-heading"><h1 class="hero-title">${metricTitle}</h1>
       <button type="button" id="spending-toggle" class="metric-toggle" data-act="toggle-spending" aria-label="${nextTitle}" title="${nextTitle}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h15l-3-3m3 3-3 3M20 17H5l3-3m-3 3 3 3"/></svg>
       </button></div>
     <div class="metric-value" aria-live="polite">${fig(cumulative?m.spent:tot)}</div>
-    <p class="sub cycle-range">${esc(m.name)}</p>${budgetTargetHTML(m)}
+    <p class="sub cycle-range">${cumulative?esc(m.name):esc(shortDate(t))+" · Today’s total"}</p>${budgetTargetHTML(m)}
   </section>
   <section class="history today-history" aria-label="Today’s entries">
     <div class="section-head"><h3>Today’s entries</h3><span>${todays.length} ${todays.length===1?"entry":"entries"}</span></div>
