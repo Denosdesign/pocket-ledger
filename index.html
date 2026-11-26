@@ -804,12 +804,12 @@ function dbRange({from="0000-01-01",to="9999-12-31",limit=Infinity,after=null,fi
     tx.onabort=()=>reject(tx.error||new Error("Query failed"));
   })
 }
-function dbSummary(from,to){return new Promise((resolve,reject)=>{
+function dbSummary(from,to,includePlanRecent=false){return new Promise((resolve,reject)=>{
   const tx=db.transaction("entries","readonly"),idx=tx.objectStore("entries").index("byDateCreated"),req=idx.openCursor(dateKey(from,to));
-  const out={spent:0,count:0,categories:Object.create(null),unknown:0,adjustments:0,entriesCount:0,categoryPatterns:Object.create(null),purchaseDays:Object.create(null),grossPurchases:0,separateSpent:0,planTotals:Object.create(null),planCounts:Object.create(null)};
+  const out={spent:0,count:0,categories:Object.create(null),unknown:0,adjustments:0,entriesCount:0,categoryPatterns:Object.create(null),purchaseDays:Object.create(null),grossPurchases:0,separateSpent:0,everydayPurchaseCount:0,planTotals:Object.create(null),planCounts:Object.create(null),planRecent:Object.create(null)};
   req.onerror=()=>reject(req.error);
   req.onsuccess=()=>{const cursor=req.result;if(!cursor){resolve(out);return}const e=cursor.value;
-    if(SPEND.has(e.type)){out.spent+=e.amount;out.count++;addPlanStats(out,e)}
+    if(SPEND.has(e.type)){out.spent+=e.amount;out.count++;addPlanStats(out,e);if(!isSeparate(e)&&(e.type==='purchase'||e.type==='unknown'))out.everydayPurchaseCount++;if(includePlanRecent&&planById(e.planId)){const list=out.planRecent[e.planId]||(out.planRecent[e.planId]=[]);list.push(e);list.sort(byNewest);if(list.length>8)list.pop()}}
     if(e.type==="purchase"){out.entriesCount++;const k=e.category||"Uncategorised";out.categories[k]=(out.categories[k]||0)+e.amount;const pattern=out.categoryPatterns[k]||(out.categoryPatterns[k]={count:0,largest:0});pattern.count++;pattern.largest=Math.max(pattern.largest,e.amount);out.grossPurchases+=e.amount;out.purchaseDays[e.date]=(out.purchaseDays[e.date]||0)+e.amount}
     if(e.type==="unknown")out.unknown+=e.amount;
     if(e.type==="adjustment")out.adjustments+=e.amount;
@@ -905,7 +905,7 @@ async function refreshView({preservePage=false}={}){
       const [summary,pageRows,reviews]=await Promise.all([dbSummary(from,to),dbRange({from,to,limit:RECEIPT_PAGE_SIZE,after:receiptAfter,filter:receiptFilter}),dbCountStatuses(["none","review","proposal","ai"])]);
       result={receipt:pageRows.entries,receiptSummary:summary,receiptNext:pageRows.nextKey,receiptMore:pageRows.more,receiptPage:receiptTrail.length+1,reviewCount:reviews};
       records=result.receipt
-    }else if(view==='prefs'&&['plans','planEdit'].includes(prefsPage)){result={planSummary:await dbSummary('0000-01-01',t)};records=[]}else{records=[]}
+    }else if(view==='prefs'&&['plans','planEdit'].includes(prefsPage)){result={planSummary:await dbSummary('0000-01-01',t,true)};records=[]}else{records=[]}
     if(epoch!==loadEpoch)return;
     watchRecords(records);DATA={...DATA,...result};loading=false;render()
   }catch(e){if(epoch!==loadEpoch)return;loading=false;storageOK=false;render();toast("Could not load records: "+e.message)}
@@ -1545,7 +1545,7 @@ function validateCapture(j){
     return {name,date,amount,category:categories().includes(e.category)?e.category:''};});
 }
 function prepareCapture(rows){return rows.map(row=>{const e={...row,type:'purchase',category:null,status:'none'};categorize(e);return {...row,planId:sheet?.planId||"",category:octopusLabelKind(row.name)?(e.category||''):(e.category||row.category||''),amt:plain(row.amount)}})}
-function captureCategoryLabel(row){return row.category||(aiReady()?"Auto classify after saving":"Needs category")}
+function captureCategoryLabel(row){const cat=row.category||(aiReady()?"Auto classify after saving":"Needs category"),plan=planById(row.planId);return cat+(plan?' · '+plan.name:'')}
 function entryModes(smart){return `<div class="entry-modes" role="group" aria-label="Input mode"><button type="button" data-sact="smart-back" aria-pressed="${!smart}">Manual</button><button type="button" data-sact="smart-open" aria-pressed="${smart}">${aiMark} Smart capture</button></div>`}
 function renderSmartSheet(){const s=sheet;if(!s?.smart)return;const f=s.smart,rows=f.rows||[],review=f.stage==="review";
   const old=$("sheet-root").querySelector(".sheet"),oldScroll=old?.scrollTop||0,oldStage=old?.dataset.stage;
@@ -1682,20 +1682,20 @@ function forecastFor(m,ref,current,history){const elapsed=daysBetween(m.first,re
   for(const e of history){if(!SPEND.has(e.type)||isSeparate(e))continue;if(octopusRecordKind(e))walletHistory+=e.amount;else byDay[toDate(e.date).getDay()]+=e.amount;if(e.type==='purchase'||e.type==='unknown')seen.add(e.date)}
   if(remaining===0)return {amount:actual,method:'Financial month ends today; excludes any unlogged expenses.'};
   if(seen.size>=21){let future=0;for(let i=1;i<=remaining;i++){const d=toDate(addDays(ref,i)).getDay();future+=Math.max(0,byDay[d]/days[d])}future+=Math.max(0,walletHistory/56)*remaining;return {amount:Math.round(actual+future),method:'Based on the previous eight weeks by weekday, with Octopus payments averaged over the full period, plus recorded spending this month.'}}
-  if(elapsed>=3&&current.count>=3)return {amount:Math.round(actual+Math.max(0,actual/elapsed)*remaining),method:'Based on recorded spending so far and the remaining calendar days.'};
+  if(elapsed>=3&&current.everydayPurchaseCount>=3)return {amount:Math.round(actual+Math.max(0,actual/elapsed)*remaining),method:'Based on recorded spending so far and the remaining calendar days.'};
   return null;
 }
 // Use bounded local history windows, never transaction labels or individual records in the AI payload.
 function insightWindow(rows,from,to){
-  const dates=new Set(),categoryTotals=Object.create(null),categoryRecords=Object.create(null);let spending=0,recordCount=0,unknown=0,adjustments=0,walletAmount=0,explicitTopups=0,walletCount=0,separateSpent=0;
+  const dates=new Set(),everydayDates=new Set(),categoryTotals=Object.create(null),categoryRecords=Object.create(null);let spending=0,recordCount=0,unknown=0,adjustments=0,walletAmount=0,explicitTopups=0,walletCount=0,separateSpent=0;
   for(const e of rows){if(e.date<from||e.date>to||!SPEND.has(e.type))continue;spending+=e.amount;recordCount++;if(isSeparate(e))separateSpent+=e.amount;
-    if(e.type==='purchase'||e.type==='unknown')dates.add(e.date);
+    if(e.type==='purchase'||e.type==='unknown'){dates.add(e.date);if(!isSeparate(e))everydayDates.add(e.date)}
     if(e.type==='unknown')unknown+=e.amount;
     if(e.type==='adjustment')adjustments+=e.amount;
     if(e.type==='purchase'){const k=e.category||'Uncategorised';categoryTotals[k]=(categoryTotals[k]||0)+e.amount;const p=categoryRecords[k]||(categoryRecords[k]={count:0,largest:0,dates:new Set(),walletAmount:0,explicitTopups:0,separateAmount:0});if(isSeparate(e))p.separateAmount+=e.amount;p.count++;p.largest=Math.max(p.largest,e.amount);p.dates.add(e.date);const kind=octopusRecordKind(e);if(kind){walletAmount+=e.amount;walletCount++;p.walletAmount+=e.amount;if(kind==='topup'){explicitTopups+=e.amount;p.explicitTopups+=e.amount}}}
   }
   const days=daysBetween(from,to);
-  return {from,to,days,spending,recordedDays:dates.size,recordCount,unknown,adjustments,walletAmount,explicitTopups,walletCount,separateSpent,categoryTotals,categoryRecords,
+  return {from,to,days,spending,recordedDays:dates.size,everydayRecordedDays:everydayDates.size,recordCount,unknown,adjustments,walletAmount,explicitTopups,walletCount,separateSpent,categoryTotals,categoryRecords,
     enoughEvidence:days>=3&&dates.size>=Math.max(3,Math.ceil(days/2))};
 }
 async function overviewAnalytics(m,ref){
@@ -1717,7 +1717,7 @@ function insightPayload(a){
   const pct=(n,d)=>d>0?Math.round(n/d*100):null,m=cycleBounds(a.to);
   const elapsed=daysBetween(a.from,a.to),totalDays=daysBetween(a.from,m.last),daysLeft=Math.max(1,daysBetween(a.to,m.last));
   const everyday=budgetSpent(a.current),budget=S.settings.budget||0,remaining=budget-everyday,allowance=Math.floor(Math.max(0,remaining)/daysLeft),h=a.horizons;
-  const windowSummary=w=>({from:w.from,to:w.to,calendar_days:w.days,days_with_purchase_or_unknown_records:w.recordedDays,
+  const windowSummary=w=>({from:w.from,to:w.to,calendar_days:w.days,days_with_purchase_or_unknown_records:w.recordedDays,days_with_everyday_purchase_or_unknown_records:w.everydayRecordedDays,
     ledger_record_count:w.recordCount,recorded_total:money(w.spending),everyday_recorded:money(w.spending-(w.separateSpent||0)),separate_planned_recorded:money(w.separateSpent||0),recorded_daily_average:money(Math.round(w.spending/w.days)),
     unnamed_spending:money(w.unknown||0),adjustments:money(w.adjustments||0),octopus_mixed_or_topup_amount_already_in_total:money(w.walletAmount||0),explicit_topups_subset:money(w.explicitTopups||0),non_octopus_recorded_amount:money(w.spending-(w.walletAmount||0)),
     evidence:w.enoughEvidence?'usable_for_recorded_period_comparison':'limited_recording_day_coverage'});
@@ -1758,7 +1758,7 @@ function insightPayload(a){
     remaining_daily_allowance_including_today:money(allowance),next_seven_days_allowance_including_today:daysLeft>=7&&remaining>=0?money(allowance*7):null,
     already_over_budget:remaining<0}:null;
   const recentEveryday=h?h.recent.spending-(h.recent.separateSpent||0):0;
-  const scenario=budget>0&&daysLeft>=7&&h?.recent.enoughEvidence&&recentEveryday>=0?
+  const scenario=budget>0&&daysLeft>=7&&h?.recent.everydayRecordedDays>=Math.ceil(h.recent.days/2)&&recentEveryday>=0?
     {condition:'If the next seven days of additional everyday recorded spending equal everyday recorded spending in the last seven completed days.',
       additional_spending:money(recentEveryday),remaining_budget_afterwards:money(remaining-recentEveryday),
       remaining_calendar_days_after_scenario:daysLeft-7,
@@ -1775,7 +1775,7 @@ function insightPayload(a){
     budget_scope:'The financial-month target covers everyday expenses including plans not marked separate. Separate plans are explicitly user allocated, not evidence of affordability. No category budgets, income, cash balances, debt obligations or future essential costs are supplied. An exceeded spending budget is not evidence of insolvency or inability to pay for necessities.',
     data_semantics:'Ledger records are manually logged amounts and can combine multiple purchases, top-ups, bills or future consumption. A record is not a meal, ride, item or day of use. Category totals and changes describe recorded amounts, not consumption, necessity or behavioural causes. Calendar day coverage is a rough comparison screen, not proof of completeness. Today is incomplete; zero recorded spending is not proof of no spending. Current budget is not historical budget. Category share uses purchase amounts only, excluding unknown-name records and adjustments. Historical category values align with the usable completed months, newest first. Missing comparisons mean insufficient evidence.'};
 }
-const insightKey=a=>JSON.stringify(['insights-plans-v11',S.settings.insightLanguage,S.settings.model,insightPayload(a)]);
+const insightKey=a=>JSON.stringify(['insights-plans-v12',S.settings.insightLanguage,S.settings.model,insightPayload(a)]);
 function insightsHTML(){const a=DATA.analytics;if(!a)return '';const p=a.previous,c=a.current,diff=c.spent-p.spent,percent=a.comparable&&p.spent>0?Math.round(diff/p.spent*100):null;
   const cache=S.insightCache,hit=cache&&cache.key===insightKey(a)&&typeof cache.text==='string';const top=Object.entries(c.categories).sort((x,y)=>y[1]-x[1])[0];
   return `<section class="sec"><h3><span>Everyday spending forecast</span><span>Estimate</span></h3>${a.forecast?`<strong class="smart-number">${money(a.forecast.amount)}</strong><p class="note">${esc(a.forecast.method)} ${S.settings.budget?(a.forecast.amount>S.settings.budget?'Above the everyday target.':'Within the everyday target.'):'No everyday target set.'} Excludes separate plans. Estimates recorded payments, not actual consumption. Octopus funding dates may differ from use dates; excludes unknown future bills.</p>`:'<p class="note">Not enough recorded spending yet for a useful estimate.</p>'}</section><section class="sec"><h3><span>${aiMark} Spending insights</span><button type="button" class="link ink" data-act="insight-run" ${insightsBusy||!c.count?'disabled':''}>${insightsBusy?'Generating…':hit?'Regenerate':'Generate insights'}</button></h3>${a.comparable?`<div class="line"><span>Same elapsed period last month<small>${esc(a.previousFrom)} to ${esc(a.previousTo)}</small></span><strong>${money(p.spent)}</strong></div><div class="line"><span>Recorded this month<small>${esc(a.from)} to ${esc(a.to)}</small></span><strong>${money(c.spent)}</strong></div><p class="note">${money(diff,{sign:true})}${percent!==null?' · '+Math.abs(percent)+'% '+(percent>0?'higher':percent<0?'lower':'change'):''}</p>`:'<p class="note">No comparable prior period with entries yet.</p>'}${top?`<p class="note">Largest category so far: ${esc(top[0])} · ${money(top[1])}.</p>`:''}<p class="note">AI receives only these aggregated figures, not receipt names or individual transactions.</p>${hit?`<div class="smart-result"><p class="smart-report">${esc(cache.text)}</p><p class="note">Saved insight · ${esc(cache.date||'')}</p></div>`:''}${insightsError?`<p class="err" role="status">${esc(insightsError)}</p>`:''}</section>`
@@ -1893,8 +1893,8 @@ function plansHTML(){
 }
 function planEditHTML(){
   const d=planDraft;if(!d)return '';
-  const existing=planById(d.id);
-  return `<section class="sec"><label class="fld"><span>Name</span><input id="plan-name" class="in" value="${esc(d.name)}" maxlength="48" placeholder="e.g. UK trip 2027"></label><label class="fld"><span>Total target (optional)</span><input id="plan-target" class="in" inputmode="decimal" value="${esc(d.target)}" placeholder="No target"></label><div class="plan-scope"><strong>Budget treatment</strong>${existing?`<p class="note">${existing.separate?'Separate from everyday target':'Included in everyday target'}. Budget treatment is fixed to keep historical comparisons consistent. You can move individual expenses to another plan.</p>`:`<label class="erase-check"><input id="plan-separate" type="checkbox" ${d.separate?'checked':''}><span>Use a separate budget<br><small>I have allocated money outside my everyday target. Plan expenses still count towards total spending.</small></span></label>`}</div>${d.error?`<p class="err" role="alert">${esc(d.error)}</p>`:''}<div class="acts"><button type="button" class="link" data-act="prefs-back">Cancel</button><button type="button" class="btn push" data-act="plan-save" ${categoryBusy?'disabled':''}>Save plan</button></div>${existing?`<div class="acts" style="margin-top:20px"><button type="button" class="link" data-act="plan-archive">${existing.archived?'Reopen plan':'Archive plan'}</button></div><p class="note">Archiving hides a plan from new expenses without changing its records or budget treatment.</p>`:''}</section>`
+  const existing=planById(d.id),recent=existing?(DATA.planSummary?.planRecent?.[existing.id]||[]):[],count=existing?(DATA.planSummary?.planCounts?.[existing.id]||0):0;
+  return `<section class="sec"><label class="fld"><span>Name</span><input id="plan-name" class="in" value="${esc(d.name)}" maxlength="48" placeholder="e.g. UK trip 2027"></label><label class="fld"><span>Total target (optional)</span><input id="plan-target" class="in" inputmode="decimal" value="${esc(d.target)}" placeholder="No target"></label><div class="plan-scope"><strong>Budget treatment</strong>${existing?`<p class="note">${existing.separate?'Separate from everyday target':'Included in everyday target'}. Budget treatment is fixed to keep historical comparisons consistent. You can move individual expenses to another plan.</p>`:`<label class="erase-check"><input id="plan-separate" type="checkbox" ${d.separate?'checked':''}><span>Use a separate budget<br><small>I have allocated money outside my everyday target. Plan expenses still count towards total spending.</small></span></label>`}</div>${d.error?`<p class="err" role="alert">${esc(d.error)}</p>`:''}<div class="acts"><button type="button" class="link" data-act="prefs-back">Cancel</button><button type="button" class="btn push" data-act="plan-save" ${categoryBusy?'disabled':''}>Save plan</button></div>${existing?`<div class="acts" style="margin-top:20px"><button type="button" class="link" data-act="plan-archive">${existing.archived?'Reopen plan':'Archive plan'}</button></div><p class="note">Archiving hides a plan from new expenses without changing its records or budget treatment.</p>`:''}</section>${existing?`<section class="sec"><h3><span>Recent expenses</span><span>${count} records</span></h3>${recent.length?recent.map(rowHTML).join(''):'<p class="empty">No expenses linked yet.</p>'}${count>recent.length?'<p class="note">Showing the latest 8 records. All expenses remain in Receipt.</p>':''}</section>`:''}`
 }
 function openPlanEdit(id=null){const p=planById(id);planDraft={id:p?.id||null,name:p?.name||'',target:p?.target?plain(p.target):'',separate:p?.separate||false,error:''};prefsPage='planEdit';render();window.scrollTo(0,0)}
 async function savePlan(archive=false){
