@@ -532,6 +532,8 @@ input:not([type=checkbox]):not([type=radio]),select,textarea{font-size:max(16px,
 .erase-actions .btn,.erase-final{width:100%;min-height:48px;border-radius:999px;font-size:15px;font-weight:500}
 .erase-final{border:1px solid #B43C36;background:#B43C36;color:#fff;padding:12px 15px}
 .erase-final:disabled{border-color:var(--line);background:var(--soft);color:var(--muted);opacity:.7;cursor:default}
+
+.category-list .settings-row{min-height:48px;padding:11px 14px}.category-list .settings-row+div.settings-row{border-top:1px solid var(--line)}.category-danger{background:#B43C36!important;color:#fff!important;border-color:#B43C36!important}#category-rename,#category-target{font-size:16px}
 </style>
 </head>
 <body>
@@ -610,7 +612,13 @@ input:not([type=checkbox]):not([type=radio]),select,textarea{font-size:max(16px,
 "use strict";
 const STORE_KEY="pocket-ledger-v1";
 const BASE_CATEGORIES=["Food","Groceries","Transport","Clothing","Shopping","Entertainment","Health","Bills","Home","Travel","Other"];
-const categories=()=>[...BASE_CATEGORIES.filter(c=>c!=="Other"),...(S.customCategories||[]),"Other"];
+const categories=()=>S.categoryList||defaultCategoryList(S.customCategories||[]);
+const defaultCategoryList=custom=>[...BASE_CATEGORIES.filter(c=>c!=="Other"),...custom,"Other"];
+function validCategoryList(list){return Array.isArray(list)&&list.length>=1&&list.length<=43&&list.at(-1)==="Other"&&list.every(x=>typeof x==="string"&&x.length>=2&&x.length<=28&&cleanCategory(x)===x&&categoryKey(x)!=="uncategorised")&&new Set(list.map(categoryKey)).size===list.length}
+function categoryAliases(list,source){const aliases={};for(const cat of BASE_CATEGORIES){const v=source&&Object.hasOwn(source,cat)?source[cat]:cat;aliases[cat]=list.includes(v)?v:null}aliases.Other="Other";return aliases}
+function builtinCategory(cat){const v=S.builtinCategoryMap?.[cat];return categories().includes(v)?v:null}
+function syncCustomCategories(state){state.customCategories=state.categoryList.filter(x=>!BASE_CATEGORIES.includes(x));return state}
+
 const COLOURWAYS={apricot:{name:"Apricot",colour:"#F18A47"},blue:{name:"Blue",colour:"#547BDC"},green:{name:"Jade",colour:"#44A786"},rose:{name:"Rose",colour:"#D97591"}};
 const THEME_MODES=["light","dark","system"];
 const SPEND=new Set(["purchase","unknown","adjustment"]);
@@ -651,7 +659,7 @@ const INSIGHT_LANGUAGES={
   'zh-HK-spoken':{label:'香港中文（口語）',guide:'使用自然香港粵語口語及繁體字，約150至250字。可以使用「你今個月」「仲有」「使費」等地道香港粵語表達，避免內地詞彙及簡體字。'}
 };
 function defaults(){return{dict:{},ai:{requests:0,cost:0,lastError:""},
-  customCategories:[],aiResults:{},settings:{budget:600000,currency:"HK$",ai:false,key:"",model:"",deny:true,preferLocal:true,suggestNew:true,palette:"apricot",theme:"light",cycleStart:1,insightLanguage:"en-GB"},seeded:false}}
+  customCategories:[],categoryList:null,builtinCategoryMap:null,aiResults:{},settings:{budget:600000,currency:"HK$",ai:false,key:"",model:"",deny:true,preferLocal:true,suggestNew:true,palette:"apricot",theme:"light",cycleStart:1,insightLanguage:"en-GB"},seeded:false}}
 let S=defaults(),storageOK=true,db=null,dbReady=false,bootError="",saveQueue=Promise.resolve();
 function normaliseState(p={}){
   const d=defaults();S={...d,...p,settings:{...d.settings,...(p.settings||{})},ai:{...d.ai,...(p.ai||{})}};
@@ -661,6 +669,8 @@ function normaliseState(p={}){
   S.settings.cycleStart=validCycleStart(S.settings.cycleStart)?S.settings.cycleStart:1;
   S.settings.insightLanguage=Object.hasOwn(INSIGHT_LANGUAGES,S.settings.insightLanguage)?S.settings.insightLanguage:"en-GB";
   S.customCategories=Array.isArray(S.customCategories)?S.customCategories.filter(x=>typeof x==="string"&&x.length>=2&&x.length<=28&&!BASE_CATEGORIES.some(c=>norm(c)===norm(x))).slice(0,32):[];
+  S.categoryList=validCategoryList(S.categoryList)?S.categoryList.slice():defaultCategoryList(S.customCategories);
+  S.builtinCategoryMap=categoryAliases(S.categoryList,S.builtinCategoryMap);syncCustomCategories(S);
   if(!S.aiResults||typeof S.aiResults!=="object"||Array.isArray(S.aiResults))S.aiResults={};
   if(!S.dict||typeof S.dict!=="object"||Array.isArray(S.dict))S.dict={};
   applyAppearance();
@@ -906,16 +916,38 @@ function cleanCategory(value){return String(value||"").trim().replace(/\s+/g," "
 function addCategory(value,force=false){const name=cleanCategory(value),similar=relatedCategories(name);
   if(!name||name.length<2)return{error:"Enter at least two letters."};
   if(categories().some(c=>categoryKey(c)===categoryKey(name)))return{error:`${similar[0]||name} already exists.`};
-  if(S.customCategories.length>=32)return{error:"You've reached the custom category limit. Merge similar ones first."};
+  if(categoryKey(name)==="uncategorised")return{error:"Uncategorised is reserved."};
+  if(categories().length>=43)return{error:"You have reached the category limit. Merge similar ones first."};
   if(similar.length&&!force)return{similar,name};
-  S.customCategories.push(name);S.aiResults={};aiCache.clear();persist();return{added:name}}
-async function mergeCategory(from,to){if(!S.customCategories.includes(from)||!categories().includes(to)||from===to)return false;
-  const before=structuredClone(stateSnapshot());
-  for(const[k,v]of Object.entries(S.dict))if(v===from)S.dict[k]=to;
-  S.customCategories=S.customCategories.filter(x=>x!==from);S.aiResults={};aiCache.clear();
-  try{await dbMassEdit("byCategoryDate",IDBKeyRange.bound([from,""],[from,"\uffff"]),e=>{
-    e.category=to;if(e.status!=="approved")e.status="approved";delete e.suggestedCategory;return e},stateSnapshot());return true}
-  catch(e){normaliseState(before);throw e}}
+  S.categoryList.splice(S.categoryList.length-1,0,name);syncCustomCategories(S);S.aiResults={};aiCache.clear();persist();return{added:name}}
+function categoryChangePlan(state,from,to,mode){
+  const list=state.categoryList;
+  if(!list.includes(from)||from==="Other")throw Error("This category cannot be changed.");
+  if(mode==="rename"){if(!to||to.length<2||cleanCategory(to)!==to||categoryKey(to)==="uncategorised"||list.some(x=>x!==from&&categoryKey(x)===categoryKey(to)))throw Error("Choose a valid, unique category name.");if(to===from)throw Error("Choose a different name.")}
+  else if(!["merge","delete"].includes(mode)||to===from||to!==null&&!list.includes(to)||mode==="merge"&&!to)throw Error("Choose a valid destination.");
+  const next=structuredClone(state);
+  next.categoryList=mode==="rename"?list.map(x=>x===from?to:x):list.filter(x=>x!==from);
+  for(const [key,value] of Object.entries(next.dict||{}))if(value===from){if(to)next.dict[key]=to;else delete next.dict[key]}
+  for(const [key,value] of Object.entries(next.builtinCategoryMap||{}))if(value===from)next.builtinCategoryMap[key]=to;
+  syncCustomCategories(next);next.aiResults={};delete next.insightCache;return next;
+}
+function reviseCategoryRecord(entry,from,to){
+  if(entry.category!==from&&entry.suggestedCategory!==from)return null;
+  const e={...entry};
+  if(e.category===from){e.category=to;if(e.type==="purchase"){e.status=to?"approved":"none";delete e.why;delete e.suggestedCategory}}
+  if(e.suggestedCategory===from){delete e.suggestedCategory;if(e.status==="proposal"){e.status="none";delete e.why}}
+  return e;
+}
+async function changeCategory(from,to,mode,expectedCount){
+  const next=categoryChangePlan(stateSnapshot(),from,to,mode);
+  await dbWrite(["entries","app"],tx=>{
+    const store=tx.objectStore("entries"),req=store.openCursor();let count=0;
+    req.onsuccess=()=>{const cur=req.result;if(!cur){if(count!==expectedCount){tx.abort();return}tx.objectStore("app").put({key:"current",value:next});return}
+      if(cur.value.category===from)count++;
+      const patch=reviseCategoryRecord(cur.value,from,to);if(patch)cur.update(recordFor(patch));cur.continue()};
+  });
+  normaliseState(next);aiCache.clear();queryPlans.clear();
+}
 function applyAppearance(){const s=S.settings,root=document.documentElement;
   root.dataset.colour=COLOURWAYS[s.palette]?s.palette:"apricot";
   root.dataset.mode=THEME_MODES.includes(s.theme)?s.theme:"light";
@@ -928,11 +960,11 @@ function lookup(name){const k=norm(name);if(!k)return null;
   if(S.dict[k]&&categories().includes(S.dict[k]))return{cat:S.dict[k],src:"user"};
   if(AMBIGUOUS.has(k))return{cat:null,src:"ambiguous"};
   if(!S.settings.preferLocal&&aiReady())return null;
-  if(BUILTIN.has(k))return{cat:BUILTIN.get(k),src:"builtin"};
+  if(BUILTIN.has(k)&&builtinCategory(BUILTIN.get(k)))return{cat:builtinCategory(BUILTIN.get(k)),src:"builtin"};
   const toks=k.split(" ");
   for(const t of toks)if(S.dict[t]&&categories().includes(S.dict[t]))return{cat:S.dict[t],src:"user"};
-  for(const t of toks)if(BUILTIN.has(t))return{cat:BUILTIN.get(t),src:"builtin"};
-  for(const[key,cat]of BUILTIN)if(/[㐀-鿿]/.test(key)&&key.length>=2&&k.includes(key))return{cat,src:"builtin"};
+  for(const t of toks)if(BUILTIN.has(t)&&builtinCategory(BUILTIN.get(t)))return{cat:builtinCategory(BUILTIN.get(t)),src:"builtin"};
+  for(const[key,cat]of BUILTIN)if(/[㐀-鿿]/.test(key)&&key.length>=2&&k.includes(key)&&builtinCategory(cat))return{cat:builtinCategory(cat),src:"builtin"};
   return null}
 function categorize(e){
   if(e.type!=="purchase"){e.category=null;e.status="na";return false}
@@ -1001,7 +1033,7 @@ function queueAI(ids){for(const id of ids){if(aiPending.has(id))continue;aiPendi
   aiChain=aiChain.then(()=>runAI(id)).catch(()=>{})}}
 async function runAI(id){
   let e=await getEntry(id);if(!e){aiPending.delete(id);return}
-  const k=norm(e.name),signature=[...BASE_CATEGORIES,...(S.customCategories||[])].join("|")+"|"+S.settings.suggestNew;
+  const k=norm(e.name),signature=categories().join("|")+"|"+S.settings.suggestNew;
   try{
     if(!["none","pending"].includes(e.status))return;
     e.status="pending";await dbPut(e);
@@ -1128,8 +1160,8 @@ function viewOverview(){const m=monthStats(),pct=m.budget?Math.max(0,Math.min(10
 
 function modelOptionsHTML(){const q=norm(modelQuery),list=models?models.filter(m=>!q||norm(m.id+" "+m.name).includes(q)).slice(0,8):[];
   return list.map(m=>`<button type="button" data-act="pick-model" data-id="${esc(m.id)}" aria-pressed="${m.id===S.settings.model}"><span>${esc(m.id)}</span><span>${m.p||m.c?`$${(m.p*1e6).toFixed(2)} / $${(m.c*1e6).toFixed(2)} per 1M`:"free"}</span></button>`).join("")||`<p class="empty">No match.</p>`}
-const PREF_PAGES={appearance:'Appearance',budget:'Budget & financial month',categories:'Categories',intelligence:'AI & insights',learned:'Learned names',data:'Data & backup',erase:'Erase all data'};
-let prefsPage='',eraseState=null,eraseBusy=false,importBusy=false,testBusy=false;
+const PREF_PAGES={appearance:'Appearance',budget:'Budget & financial month',categories:'Categories',intelligence:'AI & insights',learned:'Learned names',data:'Data & backup',erase:'Erase all data',categoryEdit:'Edit category'};
+let prefsPage='',eraseState=null,eraseBusy=false,importBusy=false,testBusy=false,categoryEdit=null,categoryBusy=false;
 function settingsRow(id,title,detail,ico){return `<button type="button" class="settings-row" data-act="prefs-page" data-page="${id}"><span class="settings-icon">${ico}</span><span class="settings-row-text"><strong>${esc(title)}</strong><small>${esc(detail)}</small></span><svg class="settings-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg></button>`}
 function prefsIcon(path){return `<svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg>`}
 function settingsHome(){const s=S.settings;
@@ -1144,14 +1176,14 @@ function settingsHome(){const s=S.settings;
     ${settingsRow('data','Data & backup',storageOK?'Stored on this device':'Storage error',prefsIcon('<path d="M4 7h16v13H4zM3 4h18v3H3zm6 7h6"/>'))}
   </div>${typeof homeGuideHTML==='function'?homeGuideHTML(true):''}${foot()}`;
 }
-function prefsBack(){if(eraseBusy)return;prefsPage=prefsPage==='erase'?'data':'';eraseState=null;backupText='';render();window.scrollTo(0,0)}
+function prefsBack(){if(eraseBusy||categoryBusy)return;prefsPage=prefsPage==='erase'?'data':prefsPage==='categoryEdit'?'categories':'';eraseState=null;categoryEdit=null;backupText='';render();window.scrollTo(0,0)}
 function openPrefsPage(id){if(eraseBusy||!Object.hasOwn(PREF_PAGES,id)||id==='erase')return;prefsPage=id;backupText='';render();window.scrollTo(0,0)}
 function viewPrefs(){const s=S.settings;
   const dict=Object.entries(S.dict).sort((a,b)=>a[0].localeCompare(b[0]));
   const sw=(id,key,label)=>`<label class="sw"><input type="checkbox" id="${id}" data-set="${key}" ${s[key]?"checked":""} aria-label="${label}"><span></span></label>`;
 
   if(!prefsPage)return settingsHome();
-  const titles=`${masthead()}<button type="button" class="settings-back" data-act="prefs-back"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10 4-4 4 4 4"/></svg>${prefsPage==='erase'?'Data &amp; backup':'Settings'}</button><h2 class="settings-subtitle">${esc(PREF_PAGES[prefsPage])}</h2>`;
+  const titles=`${masthead()}<button type="button" class="settings-back" data-act="prefs-back"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10 4-4 4 4 4"/></svg>${prefsPage==='erase'?'Data &amp; backup':prefsPage==='categoryEdit'?'Categories':'Settings'}</button><h2 class="settings-subtitle">${esc(PREF_PAGES[prefsPage])}</h2>`;
   let content='';
   if(prefsPage==='appearance')content=`<section class="sec appearance-section"><h3><span>Colour &amp; theme</span></h3>
     <p class="note">Choose your accent colour and display mode.</p>
@@ -1176,8 +1208,9 @@ function viewPrefs(){const s=S.settings;
     <label class="fld"><span>New category</span><input class="in sm" id="p-category-name" data-category-input="1" value="${esc(categoryDraft)}" maxlength="28" placeholder="e.g. Pet care" autocomplete="off"></label>
     ${categoryFeedback?`<p class="note${categoryConfirm?" warn":""}" role="status">${esc(categoryFeedback)}</p>`:""}
     <div class="acts"><button class="btn" type="button" data-act="add-category">${categoryConfirm?"Add anyway":"Add category"}</button>${categoryConfirm?`<button class="link" type="button" data-act="cancel-category">Use an existing one</button>`:""}</div>
-    ${S.customCategories.length?`<div class="custom-cat-list">${S.customCategories.map(c=>`<div class="custom-cat"><strong>${esc(c)}</strong><label class="sr" for="merge-${esc(norm(c))}">Merge ${esc(c)} into</label><select id="merge-${esc(norm(c))}" data-merge="${esc(c)}" class="in sm"><option value="">Merge into…</option>${categories().filter(x=>x!==c).map(x=>`<option value="${esc(x)}" ${mergeChoice[c]===x?"selected":""}>${esc(x)}</option>`).join("")}</select><button class="link ink" type="button" data-act="merge-category" data-cat="${esc(c)}">Merge</button></div>`).join("")}</div>`:""}
+    <div class="settings-group category-list" style="margin-top:20px">${categories().map(cat=>cat==="Other"?`<div class="settings-row"><span class="settings-row-text"><strong>Other</strong><small>Reserved fallback category</small></span></div>`:`<button type="button" class="settings-row" data-act="category-edit" data-cat="${esc(cat)}"><span class="settings-row-text"><strong>${esc(cat)}</strong></span><svg class="settings-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg></button>`).join("")}</div>
   </section>`;
+  else if(prefsPage==='categoryEdit')content=categoryEditHTML();
   else if(prefsPage==='learned')content=`<section class="sec"><h3><span>Learned names</span><span>${dict.length||""}</span></h3>
     ${dict.length?dict.map(([k,v])=>`<div class="line"><span>${esc(k)}</span><span class="v muted" style="color:var(--muted)">${esc(v)}<button class="x" data-act="forget" data-k="${esc(k)}" aria-label="Forget ${esc(k)}">×</button></span></div>`).join(""):`<p class="empty">Categories you choose are remembered here.</p>`}
   </section>`;
@@ -1226,7 +1259,7 @@ function route(){const h=location.hash.slice(1),next=VIEWS.includes(h)?h:"today"
   clearTimeout(routeTimer);const main=$("main");
   if(next===view){main.classList.remove("is-leaving");render();return}
   const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const enter=()=>{if(next!=="prefs"&&!eraseBusy){prefsPage="";eraseState=null;backupText=""}view=next;main.classList.remove("is-leaving","is-entering");main.removeAttribute("aria-busy");
+  const enter=()=>{if(next!=="prefs"&&!eraseBusy&&!categoryBusy){prefsPage="";eraseState=null;categoryEdit=null;backupText=""}view=next;main.classList.remove("is-leaving","is-entering");main.removeAttribute("aria-busy");
     window.scrollTo({top:0,behavior:"instant"});refreshView();
     if(!reduced)requestAnimationFrame(()=>main.classList.add("is-entering"))};
   if(reduced){enter();return}
@@ -1241,7 +1274,7 @@ function toast(msg,undo){clearTimeout(toastTimer);const r=$("toast-root");
 function savedMsg(e){const m=monthStats();return `${e.name} saved.`}
 async function removeEntry(id){await dbDelete(id);visible.delete(id);await refreshView()}
 async function saveCapture(){
-  if(!dbReady||eraseBusy)return;
+  if(!dbReady||eraseBusy||categoryBusy)return;
   const amount=parseMoney(draft.amt);const name=draft.unknown?"???":draft.name.trim();
   if(!name){capErr="Add a short name.";render();return}
   if(amount===null){capErr="Enter an amount above zero.";render();return}
@@ -1255,7 +1288,7 @@ async function saveCapture(){
 }
 let sheet=null,sheetReturnFocus=null;
 async function openSheet(id,preset={}){
-  if(!dbReady||eraseBusy)return;
+  if(!dbReady||eraseBusy||categoryBusy)return;
   const e=id?await getEntry(id):null;
   if(id&&!e){toast("Entry not found.");return}
   sheet={id:e?.id||null,type:e?.type||preset.type||"purchase",name:e?.name||preset.name||"",amt:e?plain(e.amount):"",date:e?.date||preset.date||today(),category:e?.category||"",err:"",armed:false};
@@ -1331,15 +1364,16 @@ async function backupJSON(){
   const [rows,archive]=await Promise.all([dbAll(),dbRequest(db.transaction("legacyArchive","readonly").objectStore("legacyArchive").get("history"))]);
   const {key,...settings}=S.settings;
   return JSON.stringify({app:"pocket-ledger",version:2,exported:new Date().toISOString(),
-    entries:rows.map(({normalisedName,...e})=>e),dict:S.dict,customCategories:S.customCategories,
+    entries:rows.map(({normalisedName,...e})=>e),dict:S.dict,customCategories:S.customCategories,categoryList:categories(),builtinCategoryMap:S.builtinCategoryMap,
     ai:{requests:S.ai.requests,cost:S.ai.cost},settings,legacy:archive?.value||{}},null,1)
 }
 function validateBackup(p){
   if(!p||p.app!=="pocket-ledger"||![1,2].includes(p.version)||!Array.isArray(p.entries))throw Error("That file isn't a valid Pocket Ledger backup.");
   const importedCategories=Array.isArray(p.customCategories)?p.customCategories:[];
-  if(importedCategories.length>32||!importedCategories.every(x=>typeof x==="string"&&x.length>=2&&x.length<=28)||
+  if(importedCategories.length>42||!importedCategories.every(x=>typeof x==="string"&&x.length>=2&&x.length<=28)||
     new Set(importedCategories.map(categoryKey)).size!==importedCategories.length)throw Error("Invalid custom categories.");
-  const validCategories=[...BASE_CATEGORIES,...importedCategories],types=["purchase","unknown","adjustment","repayment"],statuses=["na","none","review","proposal","pending","auto","ai","approved"],ids=new Set();
+  if(p.categoryList!=null&&!validCategoryList(p.categoryList))throw Error("Invalid category list.");
+  const validCategories=p.categoryList||[...BASE_CATEGORIES,...importedCategories],types=["purchase","unknown","adjustment","repayment"],statuses=["na","none","review","proposal","pending","auto","ai","approved"],ids=new Set();
   for(const e of p.entries){
     if(!e||typeof e.id!=="string"||!/^[a-zA-Z0-9_-]{1,80}$/.test(e.id)||ids.has(e.id)||
       typeof e.name!=="string"||e.name.length>80||!validDate(e.date)||!Number.isSafeInteger(e.amount)||
@@ -1356,21 +1390,29 @@ async function importData(text,mode="merge"){
   if(mode==="replace"&&prompt(`Replace all current records with ${p.entries.length} entries from this backup? Save your current JSON backup first. This cannot be undone. Type REPLACE ALL DATA to continue.`)!=="REPLACE ALL DATA")return;
   const d=defaults(),opts=p.settings||{},ai=p.ai||{},key=S.settings.key;
   const imported=Array.isArray(p.customCategories)?p.customCategories:[];
-  let newState={...d,dict:p.dict||{},customCategories:imported,aiResults:{},ai:{requests:Number.isSafeInteger(ai.requests)&&ai.requests>=0?ai.requests:0,cost:Number.isFinite(ai.cost)&&ai.cost>=0?ai.cost:0,lastError:""},
+  const importedList=p.categoryList||defaultCategoryList(imported);
+  let newState={...d,dict:p.dict||{},customCategories:imported,categoryList:importedList,builtinCategoryMap:categoryAliases(importedList,p.builtinCategoryMap),aiResults:{},ai:{requests:Number.isSafeInteger(ai.requests)&&ai.requests>=0?ai.requests:0,cost:Number.isFinite(ai.cost)&&ai.cost>=0?ai.cost:0,lastError:""},
     settings:{...d.settings,...opts,key,cycleStart:validCycleStart(opts.cycleStart)?opts.cycleStart:1}};
   let archive=p.version===2?p.legacy||{}:{card:p.card||[],recon:p.recon||{}};
   try{
     if(mode==="merge"){
       const ids=new Set(await dbRequest(db.transaction("entries","readonly").objectStore("entries").getAllKeys()));
-      const union=[...S.customCategories];for(const cat of imported){if(!union.some(x=>categoryKey(x)===categoryKey(cat)))union.push(cat)}
-      if(union.length>32)throw Error("Too many categories after merging. Merge similar categories first.");
-      newState={...stateSnapshot(),customCategories:union,dict:{...S.dict,...Object.fromEntries(Object.entries(p.dict||{}).filter(([k,v])=>typeof k==="string"&&[...BASE_CATEGORIES,...union].includes(v)))}};
-      const incoming=p.entries.filter(e=>!ids.has(e.id));
+      const union=categories().slice(),mapping=new Map();
+      for(const cat of importedList){
+        const existing=union.find(x=>categoryKey(x)===categoryKey(cat));
+        if(existing){mapping.set(cat,existing);continue}
+        if(BASE_CATEGORIES.includes(cat)){mapping.set(cat,builtinCategory(cat));continue}
+        if(union.length>=43)throw Error("Too many categories after merging. Merge similar categories first.");
+        union.splice(union.length-1,0,cat);mapping.set(cat,cat)
+      }
+      const incoming=p.entries.filter(e=>!ids.has(e.id)).map(e=>{if(!e.category)return e;const to=mapping.get(e.category)??null;return to===e.category?e:reviseCategoryRecord(e,e.category,to)});
+      const incomingDict=Object.fromEntries(Object.entries(p.dict||{}).filter(([k,v])=>typeof k==="string"&&mapping.get(v)).map(([k,v])=>[k,mapping.get(v)]));
+      newState=syncCustomCategories({...stateSnapshot(),categoryList:union,dict:{...S.dict,...incomingDict},aiResults:{}});
       await dbWrite(["entries","app"],tx=>{const store=tx.objectStore("entries");for(const e of incoming)store.add(recordFor(e));
         tx.objectStore("app").put({key:"current",value:structuredClone(newState)})});
-      normaliseState(newState);await refreshView();toast(`Imported ${incoming.length} new entries. Skipped ${p.entries.length-incoming.length} duplicates.`)
+      normaliseState(newState);aiCache.clear();queryPlans.clear();await refreshView();toast(`Imported ${incoming.length} new entries. Skipped ${p.entries.length-incoming.length} duplicates.`)
     }else{
-      await dbReplace(p.entries,newState,archive);normaliseState(newState);await refreshView();toast(`Restored ${p.entries.length} entries.`)
+      await dbReplace(p.entries,newState,archive);normaliseState(newState);aiCache.clear();queryPlans.clear();await refreshView();toast(`Restored ${p.entries.length} entries.`)
     }
   }catch(err){toast("Import failed: "+err.message)}
 }
@@ -1632,7 +1674,7 @@ async function loadSmartReview(to=today()){
 function smartReviewHTML(){const r=DATA.latestReview;return `<section class="sec"><h3><span>Smart review</span><button class="link" data-act="smart-review" aria-label="Refresh smart review">Refresh</button></h3>${r?.error?`<p class="err" role="status">${esc(r.error)}</p>`:r?`<p class="note">Automatically checked ${r.count} entries · Last 90 days · ${esc(new Date(r.checkedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}))}</p>${r.checks.length?r.checks.map(x=>`<div class="smart-result"><strong>${esc(x.kind)}</strong><p class="note">${esc(x.message)}</p>${x.entries.map(e=>`<button class="row" data-act="edit" data-id="${esc(e.id)}"><span class="nm">${esc(e.name)}</span><span class="meta">${esc(e.date)}</span><span class="v">${money(e.amount)}</span></button>`).join('')}</div>`).join(''):r.count?'<p class="empty">No obvious patterns to review.</p>':'<p class="empty">No recent records to check.</p>'}`:'<p class="note">Checking recent records…</p>'}<p class="note">Runs on this device. No records are changed automatically.</p></section>`}
 
 function eraseBlocked(){return !dbReady||aiPending.size>0||askBusy||insightsBusy||importBusy||testBusy||Boolean(sheet)||Boolean(categoryModal)}
-async function openErasePage(){if(eraseBusy||view!=='prefs'||prefsPage!=='data')return;
+async function openErasePage(){if(eraseBusy||categoryBusy||view!=='prefs'||prefsPage!=='data')return;
   prefsPage='erase';const state={count:null,confirmed:false,phrase:'',error:''};eraseState=state;render();window.scrollTo(0,0);
   try{const count=await dbRequest(db.transaction('entries','readonly').objectStore('entries').count());if(eraseState===state)state.count=count}catch{if(eraseState===state)state.error='Unable to verify your records. Return to Data & backup and try again.'}
   if(eraseState===state)render();
@@ -1668,6 +1710,34 @@ async function eraseConfirmed(){
   finally{eraseBusy=false;main.inert=false;if(tabs)tabs.inert=false;render();window.scrollTo(0,0)}
 }
 
+async function openCategoryEdit(name){
+  if(categoryBusy||!categories().includes(name)||name==="Other")return;
+  const state={from:name,name,mode:"rename",target:"",count:null,error:""};categoryEdit=state;prefsPage="categoryEdit";render();window.scrollTo(0,0);
+  try{state.count=await dbRequest(db.transaction("entries","readonly").objectStore("entries").index("byCategoryDate").count(IDBKeyRange.bound([name,""],[name,"\uffff"])))}catch{state.error="Unable to count records. Return to Categories and try again."}
+  if(categoryEdit===state)render();
+}
+function categoryEditHTML(){
+  const s=categoryEdit;if(!s)return "";
+  const options=categories().filter(x=>x!==s.from).map(x=>`<option value="${esc(x)}" ${s.target===x?'selected':''}>${esc(x)}</option>`).join("");
+  return `<section class="sec"><h3><span>${esc(s.from)}</span><span>${s.count===null?"Checking…":s.count+" records"}</span></h3><p class="note">All existing expense amounts and dates are preserved.</p>
+  <div class="theme-choice" role="group" aria-label="Category action">${["rename","merge","delete"].map(mode=>`<button type="button" data-act="category-mode" data-mode="${mode}" aria-pressed="${s.mode===mode}" ${categoryBusy?"disabled":""}>${mode[0].toUpperCase()+mode.slice(1)}</button>`).join("")}</div>
+  ${s.mode==="rename"?`<label class="fld"><span>Category name</span><input class="in" id="category-rename" value="${esc(s.name)}" maxlength="28" autocomplete="off" ${categoryBusy?"disabled":""}></label><p class="note">Updates historical records and learned categorisation rules.</p>`:`<label class="fld"><span>${s.mode==="merge"?"Merge into":"Move existing records to"}</span><select class="in" id="category-target" ${categoryBusy?"disabled":""}><option value="" ${s.target===""?"selected":""}>${s.mode==="delete"?"Uncategorised · review later":"Choose category"}</option>${options}</select></label><p class="note">${s.mode==="delete"?"The category will be removed. No expense records will be deleted.":"The original category will be removed and its records moved to the selected category."}</p>`}
+  ${s.error?`<p class="err" role="alert">${esc(s.error)}</p>`:""}
+  <div class="acts"><button type="button" class="link" data-act="prefs-back" ${categoryBusy?"disabled":""}>Cancel</button><button type="button" class="btn push ${s.mode==="delete"?"category-danger":""}" data-act="category-save" ${categoryBusy||s.count===null?"disabled":""}>${categoryBusy?"Saving…":s.mode==="rename"?"Save name":s.mode==="merge"?"Merge category":"Delete category"}</button></div></section>`;
+}
+async function saveCategoryEdit(){
+  const s=categoryEdit;if(!s||categoryBusy||!Number.isInteger(s.count))return;
+  if(eraseBlocked()){s.error="Wait for active operations to finish before changing categories.";render();return}
+  const to=s.mode==="rename"?cleanCategory(s.name):s.target||null;
+  try{categoryChangePlan(stateSnapshot(),s.from,to,s.mode)}catch(e){s.error=e.message;render();return}
+  if(s.mode!=="rename"&&!confirm(`${s.mode==="merge"?"Merge":"Delete"} "${s.from}"? ${s.count} records will move to ${to||"Uncategorised"}. No expense records will be deleted.`))return;
+  categoryBusy=true;s.error="";render();const main=$("main"),tabs=document.querySelector(".tabs");main.inert=true;if(tabs)tabs.inert=true;
+  try{await saveQueue.catch(()=>{});if(eraseBlocked())throw Error("Another operation is running. Try again.");
+    await changeCategory(s.from,to,s.mode,s.count);categoryEdit=null;prefsPage="categories";await refreshView();toast(s.mode==="rename"?"Category renamed.":s.mode==="merge"?"Categories merged.":"Category removed. Expense records kept.")}
+  catch(e){s.error="Could not change category. "+e.message;try{s.count=await dbRequest(db.transaction("entries","readonly").objectStore("entries").index("byCategoryDate").count(IDBKeyRange.bound([s.from,""],[s.from,"\uffff"])))}catch{s.count=null}}
+  finally{categoryBusy=false;main.inert=false;if(tabs)tabs.inert=false;render()}
+}
+
 const ACT={
   "prefs-page":el=>openPrefsPage(el.dataset.page),
   "prefs-back":()=>prefsBack(),
@@ -1694,8 +1764,9 @@ const ACT={
     if(result.error){categoryConfirm="";categoryFeedback=result.error;render();return}
     categoryConfirm="";categoryFeedback="";categoryDraft="";render();toast(`${result.added} added.`)},
   "cancel-category":()=>{categoryConfirm="";categoryFeedback="";render()},
-  "merge-category":async el=>{const from=el.dataset.cat,to=mergeChoice[from];if(!to){toast("Choose the category to merge into.");return}
-    try{if(await mergeCategory(from,to)){delete mergeChoice[from];await refreshView();toast(`${from} merged into ${to}.`)}}catch(err){toast("Merge failed: "+err.message)}},
+  "category-edit":el=>openCategoryEdit(el.dataset.cat),
+  "category-mode":el=>{if(!categoryEdit||categoryBusy||!["rename","merge","delete"].includes(el.dataset.mode))return;categoryEdit.mode=el.dataset.mode;categoryEdit.target="";categoryEdit.error="";render()},
+  "category-save":()=>saveCategoryEdit(),
   "accept-proposal":async el=>{const e=await getEntry(el.dataset.id);if(!e?.suggestedCategory)return;showCategoryModal(e.id);categoryModal.name=e.suggestedCategory;renderCategoryModal()},
   "ai-confirm-all":async()=>{const l=DATA.review.filter(e=>e.type==="purchase"&&e.status==="ai");try{for(const e of l)await setCategory(e,e.category);await refreshView();toast(`Kept ${l.length}.`)}catch(err){toast("Could not confirm categories: "+err.message)}},
   "ai-all":async()=>{const l=DATA.review.filter(e=>e.type==="purchase"&&e.status==="none");queueAI(l.map(e=>e.id))},
@@ -1723,17 +1794,19 @@ const ACT={
 
 };
 
-$("main").addEventListener("click",e=>{const el=e.target.closest("[data-act]");if(!el||eraseBusy)return;e.preventDefault();ACT[el.dataset.act]?.(el)});
+$("main").addEventListener("click",e=>{const el=e.target.closest("[data-act]");if(!el||eraseBusy||categoryBusy)return;e.preventDefault();ACT[el.dataset.act]?.(el)});
 $("main").addEventListener("submit",e=>{e.preventDefault();if(e.target.id==="cap")saveCapture()});
 $("main").addEventListener("keydown",e=>{if(e.key!=="Enter"||e.target.id!=="cap-name")return;e.preventDefault();
   if(draft.amt.trim()||/\d$/.test(draft.name.trim()))saveCapture();else $("cap-amt")?.focus()});
 $("main").addEventListener("input",e=>{const t=e.target,d=t.dataset;
+  if(t.id==="category-rename"&&categoryEdit){categoryEdit.name=t.value;return}
   if(t.id==="erase-phrase"&&eraseState){eraseState.phrase=t.value;updateEraseButton();return}
   if(t.hasAttribute("data-ledger-question")){askText=t.value;return}
   if(d.draft&&d.draft!=="date"){draft[d.draft]=t.value;if(capErr){capErr="";t.closest("form")?.querySelector(".err")?.replaceChildren()}}
   else if(d.mq){modelQuery=t.value;const results=document.querySelector(".models");if(results)results.innerHTML=modelOptionsHTML()}
   else if(d.set&&t.type!=="checkbox"){S.settings[d.set]=d.set==="currency"?safeCurrency(t.value):d.set==="model"||d.set==="key"?t.value.trim():t.value;testMsg="";persist()}});
 $("main").addEventListener("change",e=>{const t=e.target,d=t.dataset;
+  if(t.id==="category-target"&&categoryEdit){categoryEdit.target=t.value;return}
   if(t.id==="erase-ack"&&eraseState){eraseState.confirmed=t.checked;updateEraseButton();return}
   if(d.insightLanguage&&Object.hasOwn(INSIGHT_LANGUAGES,t.value)){S.settings.insightLanguage=t.value;insightsError="";persist();render();return}
   if(d.draft==="date"){draft.date=t.value||today();render()}
