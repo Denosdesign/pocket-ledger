@@ -538,6 +538,8 @@ input:not([type=checkbox]):not([type=radio]),select,textarea{font-size:max(16px,
 .order-row{gap:8px}.order-control{display:grid;place-items:center;width:44px;height:44px;flex:none;background:transparent;border:0;color:var(--accent-ink);border-radius:10px}.order-control:disabled{opacity:.25}.order-control svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.order-row small{flex:none}
 
 .ask-quick{margin:14px 0 8px}.ask-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.ask-chips button{border:1px solid var(--line);border-radius:999px;padding:8px 11px;min-height:36px;font-size:12px}.receipt-ask-panel .btn{min-height:44px;width:100%;margin-top:8px}
+
+.budget-target{margin:17px 0 4px;padding:14px 0 0;border-top:1px solid var(--line)}.budget-target-head{font-size:14px;gap:8px}.budget-target-head strong{font-size:14px;font-weight:500;text-align:right}.budget-target .meter{margin-top:9px}.budget-target-detail{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:12px;color:var(--muted)}.plan-split{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:13px}.plan-field small{font-size:11px;color:var(--muted);margin-left:6px}.plans-list{display:grid;gap:12px;margin-top:16px}.plan-card{border:1px solid var(--line);border-radius:15px;padding:14px}.plan-open{display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;border:0;background:transparent;color:var(--ink);padding:0;gap:12px}.plan-open strong,.plan-open small{display:block}.plan-open small{font-size:12px;color:var(--muted);margin-top:4px}.plan-open svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;flex:none}.plan-value{font-size:25px;font-weight:500;margin-top:14px;letter-spacing:-.025em}.plan-value small{font-size:14px;color:var(--muted);font-weight:400}.plan-card .link{margin-top:9px}.plan-scope{margin:20px 0}.plan-scope small{color:var(--muted)}#plan-name,#plan-target,#s-plan{font-size:16px}
 </style>
 </head>
 <body>
@@ -670,11 +672,22 @@ const INSIGHT_LANGUAGES={
   'zh-HK-written':{label:'香港中文（書面語）',guide:'使用香港繁體中文書面語，約150至250字。用香港慣用書面詞彙，避免簡體字、內地詞彙、粵語口語助詞及混雜語體。'},
   'zh-HK-spoken':{label:'香港中文（口語）',guide:'使用自然香港粵語口語及繁體字，約150至250字。可以使用「你今個月」「仲有」「使費」等地道香港粵語表達，避免內地詞彙及簡體字。'}
 };
-function defaults(){return{dict:{},ai:{requests:0,cost:0,lastError:""},
+// Plans are orthogonal to category and use the original expense records.
+function validPlans(plans){return Array.isArray(plans)&&plans.length<=100&&new Set(plans.map(p=>p?.id)).size===plans.length&&plans.every(p=>p&&typeof p.id==="string"&&/^[a-zA-Z0-9_]{1,80}$/.test(p.id)&&typeof p.name==="string"&&p.name.trim().length>0&&p.name.length<=48&&Number.isSafeInteger(p.target)&&p.target>=0&&typeof p.separate==="boolean"&&typeof p.archived==="boolean")}
+function planById(id){return id?(S.plans||[]).find(p=>p.id===id)||null:null}
+function isSeparate(e){return SPEND.has(e.type)&&planById(e.planId)?.separate===true}
+function budgetSpent(summary){return (summary.spent||0)-(summary.separateSpent||0)}
+function planOptions(id=""){return '<option value="">No plan · Everyday spending</option>'+S.plans.filter(p=>!p.archived||p.id===id).map(p=>`<option value="${esc(p.id)}" ${id===p.id?'selected':''}>${esc(p.name)} · ${p.separate?'Separate budget':'Everyday budget'}${p.archived?' · Archived':''}</option>`).join("")}
+function planField(id,attrs){return S.plans.some(p=>!p.archived||p.id===id)?`<label class="fld plan-field"><span>Plan <small>Optional</small></span><select class="in" ${attrs}>${planOptions(id)}</select></label>`:''}
+function addPlanStats(out,e){if(!SPEND.has(e.type))return;const p=planById(e.planId);if(!p)return;out.planTotals[p.id]=(out.planTotals[p.id]||0)+e.amount;out.planCounts[p.id]=(out.planCounts[p.id]||0)+1;if(p.separate)out.separateSpent+=e.amount}
+function mergedPlans(local,incoming){const plans=local.map(p=>({...p})),mapping=new Map();for(const p of incoming){let existing=plans.find(x=>x.id===p.id);if(existing&&existing.separate!==p.separate){let i=1,id;do{id=p.id.slice(0,65)+"_import"+i++}while(plans.some(x=>x.id===id));existing={...p,id};plans.push(existing)}else if(!existing){existing={...p};plans.push(existing)}mapping.set(p.id,existing.id)}if(!validPlans(plans))throw Error("Too many or invalid plans in backup.");return {plans,mapping}}
+
+function defaults(){return{plans:[],dict:{},ai:{requests:0,cost:0,lastError:""},
   customCategories:[],categoryList:null,builtinCategoryMap:null,octopusCategory:undefined,aiResults:{},settings:{budget:600000,currency:"HK$",ai:false,key:"",model:"",deny:true,preferLocal:true,suggestNew:true,palette:"apricot",theme:"light",cycleStart:1,insightLanguage:"en-GB"},seeded:false}}
 let S=defaults(),storageOK=true,db=null,dbReady=false,bootError="",saveQueue=Promise.resolve();
 function normaliseState(p={}){
   const d=defaults();S={...d,...p,settings:{...d.settings,...(p.settings||{})},ai:{...d.ai,...(p.ai||{})}};
+  S.plans=validPlans(S.plans)?S.plans.map(p=>({...p})):[];
   S.settings.currency=safeCurrency(S.settings.currency);
   S.settings.palette=COLOURWAYS[S.settings.palette]?S.settings.palette:"apricot";
   S.settings.theme=THEME_MODES.includes(S.settings.theme)?S.settings.theme:"light";
@@ -735,10 +748,10 @@ function cycleLabel(first,last){
   return `${shortDate(first)}${crossYear?` ${a.getFullYear()}`:""} – ${shortDate(last)}${crossYear?` ${b.getFullYear()}`:""}`}
 function monthStats(ref=today()){
   const {first,last,next}=cycleBounds(ref);
-  const spent=DATA.month.spent||0,budget=S.settings.budget||0;
+  const spent=DATA.month.spent||0,everyday=budgetSpent(DATA.month),separate=DATA.month.separateSpent||0,budget=S.settings.budget||0;
   const utc=s=>{const [y,m,d]=s.split("-").map(Number);return Date.UTC(y,m-1,d)};
   const daysLeft=Math.round((utc(last)-utc(ref))/864e5)+1;
-  return{first,last,next,spent,budget,left:budget-spent,daysLeft,
+  return{first,last,next,spent,everyday,separate,budget,left:budget-everyday,daysLeft,
     name:cycleLabel(first,last),calendarName:MONTHS_LONG[toDate(first).getMonth()]}}
 
 
@@ -793,10 +806,10 @@ function dbRange({from="0000-01-01",to="9999-12-31",limit=Infinity,after=null,fi
 }
 function dbSummary(from,to){return new Promise((resolve,reject)=>{
   const tx=db.transaction("entries","readonly"),idx=tx.objectStore("entries").index("byDateCreated"),req=idx.openCursor(dateKey(from,to));
-  const out={spent:0,count:0,categories:Object.create(null),unknown:0,adjustments:0,entriesCount:0,categoryPatterns:Object.create(null),purchaseDays:Object.create(null),grossPurchases:0};
+  const out={spent:0,count:0,categories:Object.create(null),unknown:0,adjustments:0,entriesCount:0,categoryPatterns:Object.create(null),purchaseDays:Object.create(null),grossPurchases:0,separateSpent:0,planTotals:Object.create(null),planCounts:Object.create(null)};
   req.onerror=()=>reject(req.error);
   req.onsuccess=()=>{const cursor=req.result;if(!cursor){resolve(out);return}const e=cursor.value;
-    if(SPEND.has(e.type)){out.spent+=e.amount;out.count++}
+    if(SPEND.has(e.type)){out.spent+=e.amount;out.count++;addPlanStats(out,e)}
     if(e.type==="purchase"){out.entriesCount++;const k=e.category||"Uncategorised";out.categories[k]=(out.categories[k]||0)+e.amount;const pattern=out.categoryPatterns[k]||(out.categoryPatterns[k]={count:0,largest:0});pattern.count++;pattern.largest=Math.max(pattern.largest,e.amount);out.grossPurchases+=e.amount;out.purchaseDays[e.date]=(out.purchaseDays[e.date]||0)+e.amount}
     if(e.type==="unknown")out.unknown+=e.amount;
     if(e.type==="adjustment")out.adjustments+=e.amount;
@@ -892,7 +905,7 @@ async function refreshView({preservePage=false}={}){
       const [summary,pageRows,reviews]=await Promise.all([dbSummary(from,to),dbRange({from,to,limit:RECEIPT_PAGE_SIZE,after:receiptAfter,filter:receiptFilter}),dbCountStatuses(["none","review","proposal","ai"])]);
       result={receipt:pageRows.entries,receiptSummary:summary,receiptNext:pageRows.nextKey,receiptMore:pageRows.more,receiptPage:receiptTrail.length+1,reviewCount:reviews};
       records=result.receipt
-    }else{records=[]}
+    }else if(view==='prefs'&&['plans','planEdit'].includes(prefsPage)){result={planSummary:await dbSummary('0000-01-01',t)};records=[]}else{records=[]}
     if(epoch!==loadEpoch)return;
     watchRecords(records);DATA={...DATA,...result};loading=false;render()
   }catch(e){if(epoch!==loadEpoch)return;loading=false;storageOK=false;render();toast("Could not load records: "+e.message)}
@@ -1092,14 +1105,18 @@ function metaOf(e){
   if(e.type==="unknown")return"Name unknown";if(e.type==="adjustment")return"Adjustment";if(e.type==="repayment")return"Repayment";
   if(e.status==="pending")return"Sorting…";if(e.status==="proposal")return`<span class="meta warn">New category suggested</span>`;if(needsReview(e))return`<span class="meta warn">Needs category</span>`;
   return e.category?esc(e.category)+(e.status==="ai"?" · Suggested":""):""}
-function rowHTML(e){const m=metaOf(e);
+function rowHTML(e){const plan=planById(e.planId),m=metaOf(e)+(plan?' · '+esc(plan.name):'');
   return `<button type="button" class="row ${e.type}" data-act="edit" data-id="${e.id}"><span class="nm">${esc(e.name)}</span><span class="meta">${m}</span><span class="v">${money(e.amount)}</span></button>`}
 function recentLabels(){const m=new Map();
   for(const e of DATA.recent){if(e.type!=="purchase")continue;const k=norm(e.name);if(!k)continue;const r=m.get(k);if(r)r.n++;else m.set(k,{label:e.name,n:1})}
   return [...m.values()].sort((a,b)=>b.n-a.n).slice(0,5)}
 
+function budgetTargetHTML(m,detail=false){const used=m.budget?Math.max(0,Math.min(100,m.everyday/m.budget*100)):0;
+  return `<div class="budget-target"><div class="line budget-target-head"><span>Everyday target</span><strong>${money(m.everyday)}${m.budget?' / '+money(m.budget):''}</strong></div>${m.budget?`<div class="meter"><i style="width:${used}%"></i></div><div class="budget-target-detail"><span>${m.left>=0?money(m.left)+' remaining':money(-m.left)+' above target'}</span>${detail&&m.left>0?'<span>About '+money(Math.floor(m.left/m.daysLeft))+' a day</span>':''}</div>`:'<p class="note">No target set</p>'}${m.separate!==0?`<div class="line plan-split"><span>Separate planned spending</span><strong>${money(m.separate)}</strong></div>`:''}</div>`
+}
+
 function viewToday(){const t=today(),tot=DATA.todaySpent,m=monthStats(),todays=DATA.todayEntries,rec=recentLabels();
-  const cumulative=homeMetric==="month",metricTitle=cumulative?"Cumulative spending":"Today’s spending";
+  const cumulative=homeMetric==="month",metricTitle=cumulative?"Total this financial month":"Today’s spending";
   const nextTitle=cumulative?"Show today’s spending":"Show cumulative spending";
   return `${masthead()}
   <section class="hero" aria-label="${metricTitle}">
@@ -1108,8 +1125,7 @@ function viewToday(){const t=today(),tot=DATA.todaySpent,m=monthStats(),todays=D
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h15l-3-3m3 3-3 3M20 17H5l3-3m-3 3 3 3"/></svg>
       </button></div>
     <div class="metric-value" aria-live="polite">${fig(cumulative?m.spent:tot)}</div>
-    <div class="hero-footer"><span class="budget-remain">${m.left>=0?`${money(m.left)} remaining`:`${money(-m.left)} over budget`}</span><span class="budget-context" title="${esc(m.name)}">${esc(m.name)}</span></div>
-    <div class="meter${m.left<0?" over":""}"><i style="width:${m.budget?Math.max(0,Math.min(100,m.spent/m.budget*100)):0}%"></i></div>
+    <p class="sub cycle-range">${esc(m.name)}</p>${budgetTargetHTML(m)}
   </section>
   <section class="history today-history" aria-label="Today’s entries">
     <div class="section-head"><h3>Today’s entries</h3><span>${todays.length} ${todays.length===1?"entry":"entries"}</span></div>
@@ -1158,7 +1174,7 @@ function viewReview(){const pend=DATA.review.filter(needsReview),aiList=DATA.rev
   ${smartReviewHTML()}
   ${foot()}`}
 
-function viewOverview(){const m=monthStats(),pct=m.budget?Math.max(0,Math.min(100,m.spent/m.budget*100)):0;
+function viewOverview(){const m=monthStats();
   const stats=DATA.overview||{categories:{},unknown:0,adjustments:0,count:0};
   const g=new Map(Object.entries(stats.categories));
   const order=categories(),rank=k=>k==="Other"?Infinity:order.includes(k)?order.indexOf(k):order.length;
@@ -1171,23 +1187,23 @@ function viewOverview(){const m=monthStats(),pct=m.budget?Math.max(0,Math.min(10
   return `${masthead()}
   <h2 class="overview-heading">${m.calendarName}</h2><p class="sub cycle-range">${esc(m.name)}</p>
   ${fig(m.spent)}
-  <p class="sub">of ${money(m.budget)} · ${m.left>=0?`${money(m.left)} left, about ${money(Math.floor(m.left/m.daysLeft))} a day`:`${money(-m.left)} over`}</p>
-  <div class="meter${m.left<0?" over":""}"><i style="width:${pct}%"></i></div>
+  <p class="sub">Total recorded spending</p>${budgetTargetHTML(m,true)}
   <p class="note">${stats.count} recorded ${stats.count===1?"expense":"expenses"} this financial month.</p>
-  <section class="sec"><h3><span>By category</span></h3>
+  ${overviewPlansHTML(stats)}<section class="sec"><h3><span>By category</span></h3><p class="note">Includes all recorded spending, including plans.</p>
     ${cats.length||flags.length?cats.map(c=>cat(c,false)).join("")+flags.map(f=>cat(f,true)).join("")
     +(flags.length?`<p class="note">Grey rows count toward the total but stay out of categories.</p>`:""):`<p class="empty">No spending this financial month.</p>`}
   </section>${insightsHTML()}${foot()}`}
 
 function modelOptionsHTML(){const q=norm(modelQuery),list=models?models.filter(m=>!q||norm(m.id+" "+m.name).includes(q)).slice(0,8):[];
   return list.map(m=>`<button type="button" data-act="pick-model" data-id="${esc(m.id)}" aria-pressed="${m.id===S.settings.model}"><span>${esc(m.id)}</span><span>${m.p||m.c?`$${(m.p*1e6).toFixed(2)} / $${(m.c*1e6).toFixed(2)} per 1M`:"free"}</span></button>`).join("")||`<p class="empty">No match.</p>`}
-const PREF_PAGES={appearance:'Appearance',budget:'Budget & financial month',categories:'Categories',intelligence:'AI & insights',learned:'Learned names',data:'Data & backup',erase:'Erase all data',categoryEdit:'Edit category',categoryOrder:'Category order'};
-let prefsPage='',eraseState=null,eraseBusy=false,importBusy=false,testBusy=false,categoryEdit=null,categoryBusy=false,categoryOrderDraft=null;
+const PREF_PAGES={appearance:'Appearance',budget:'Budget & financial month',categories:'Categories',intelligence:'AI & insights',learned:'Learned names',data:'Data & backup',erase:'Erase all data',categoryEdit:'Edit category',categoryOrder:'Category order',plans:'Plans',planEdit:'Edit plan'};
+let prefsPage='',eraseState=null,eraseBusy=false,importBusy=false,testBusy=false,categoryEdit=null,categoryBusy=false,categoryOrderDraft=null,planDraft=null;
 function settingsRow(id,title,detail,ico){return `<button type="button" class="settings-row" data-act="prefs-page" data-page="${id}"><span class="settings-icon">${ico}</span><span class="settings-row-text"><strong>${esc(title)}</strong><small>${esc(detail)}</small></span><svg class="settings-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg></button>`}
 function prefsIcon(path){return `<svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg>`}
 function settingsHome(){const s=S.settings;
   return `${masthead()}<h2 class="settings-title">Settings</h2><div class="settings-group-label">Your ledger</div><div class="settings-group">
     ${settingsRow('budget','Budget & financial month',money(s.budget)+' · Starts on day '+s.cycleStart,prefsIcon('<rect x="4" y="6" width="16" height="15" rx="2"/><path d="M8 3v6m8-6v6M4 11h16"/>'))}
+    ${settingsRow('plans','Plans',S.plans.filter(p=>!p.archived).length+' active',prefsIcon('<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4m8-4v4M8 13l3 3 5-6"/>'))}
     ${settingsRow('categories','Categories',categories().length+' categories',prefsIcon('<path d="M3 4h8l10 10-7 7L4 11z"/><circle cx="8" cy="8" r="1"/>'))}
     ${settingsRow('learned','Learned names',Object.keys(S.dict).length+' remembered names',prefsIcon('<path d="M5 4h14v16H5zM8 8h8m-8 4h8m-8 4h5"/>'))}
   </div><div class="settings-group-label">Preferences</div><div class="settings-group">
@@ -1197,21 +1213,21 @@ function settingsHome(){const s=S.settings;
     ${settingsRow('data','Data & backup',storageOK?'Stored on this device':'Storage error',prefsIcon('<path d="M4 7h16v13H4zM3 4h18v3H3zm6 7h6"/>'))}
   </div>${typeof homeGuideHTML==='function'?homeGuideHTML(true):''}${foot()}`;
 }
-function prefsBack(){if(eraseBusy||categoryBusy)return;prefsPage=prefsPage==='erase'?'data':['categoryEdit','categoryOrder'].includes(prefsPage)?'categories':'';eraseState=null;categoryEdit=null;categoryOrderDraft=null;backupText='';render();window.scrollTo(0,0)}
-function openPrefsPage(id){if(eraseBusy||!Object.hasOwn(PREF_PAGES,id)||id==='erase')return;prefsPage=id;backupText='';render();window.scrollTo(0,0)}
+function prefsBack(){if(eraseBusy||categoryBusy)return;prefsPage=prefsPage==='erase'?'data':prefsPage==='planEdit'?'plans':['categoryEdit','categoryOrder'].includes(prefsPage)?'categories':'';planDraft=null;eraseState=null;categoryEdit=null;categoryOrderDraft=null;backupText='';render();window.scrollTo(0,0)}
+function openPrefsPage(id){if(eraseBusy||categoryBusy||!Object.hasOwn(PREF_PAGES,id)||id==='erase')return;prefsPage=id;backupText='';if(id==='plans')refreshView();else render();window.scrollTo(0,0)}
 function viewPrefs(){const s=S.settings;
   const dict=Object.entries(S.dict).sort((a,b)=>a[0].localeCompare(b[0]));
   const sw=(id,key,label)=>`<label class="sw"><input type="checkbox" id="${id}" data-set="${key}" ${s[key]?"checked":""} aria-label="${label}"><span></span></label>`;
 
   if(!prefsPage)return settingsHome();
-  const titles=`${masthead()}<button type="button" class="settings-back" data-act="prefs-back"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10 4-4 4 4 4"/></svg>${prefsPage==='erase'?'Data &amp; backup':['categoryEdit','categoryOrder'].includes(prefsPage)?'Categories':'Settings'}</button><h2 class="settings-subtitle">${esc(PREF_PAGES[prefsPage])}</h2>`;
+  const titles=`${masthead()}<button type="button" class="settings-back" data-act="prefs-back"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10 4-4 4 4 4"/></svg>${prefsPage==='erase'?'Data &amp; backup':prefsPage==='planEdit'?'Plans':['categoryEdit','categoryOrder'].includes(prefsPage)?'Categories':'Settings'}</button><h2 class="settings-subtitle">${esc(PREF_PAGES[prefsPage])}</h2>`;
   let content='';
   if(prefsPage==='appearance')content=`<section class="sec appearance-section"><h3><span>Colour &amp; theme</span></h3>
     <p class="note">Choose your accent colour and display mode.</p>
     <div class="palette-grid" role="group" aria-label="Accent colour">${Object.entries(COLOURWAYS).map(([id,p])=>`<button type="button" class="palette-choice" data-act="palette" data-v="${id}" aria-pressed="${s.palette===id}"><span class="palette-dot" style="background:${p.colour}"></span><span>${p.name}</span>${s.palette===id?`<span class="palette-tick" aria-hidden="true">✓</span>`:""}</button>`).join("")}</div>
     <div class="theme-choice" role="group" aria-label="Display theme">${THEME_MODES.map(m=>`<button type="button" data-act="theme" data-v="${m}" aria-pressed="${s.theme===m}">${m[0].toUpperCase()+m.slice(1)}</button>`).join("")}</div>
   </section>`;
-  else if(prefsPage==='budget')content=`<section class="sec"><h3><span>Budget</span></h3>
+  else if(prefsPage==='budget')content=`<section class="sec"><h3><span>Everyday budget target</span></h3><p class="note">A flexible monthly reference, not a spending limit. Set 0 to turn it off. Only plans with a separately allocated budget are excluded.</p>
     <div class="two">
       <label class="fld amt"><span>Per financial month</span><input class="in sm" id="p-budget" data-num="budget" value="${plain(s.budget)}" inputmode="decimal"><span class="sm" aria-hidden="true">${cur()}</span></label>
       <label class="fld"><span>Currency</span><input class="in sm" id="p-cur" data-set="currency" value="${esc(s.currency)}" maxlength="5"></label>
@@ -1224,6 +1240,8 @@ function viewPrefs(){const s=S.settings;
     <div class="cycle-preview" aria-live="polite"><span>Current financial month</span><strong>${esc(monthStats().name)}</strong></div>
     <p class="note">For months with fewer days, the period starts on the last available day. For example, choosing 31 means the final day of every month.</p>
   </section>`;
+  else if(prefsPage==='plans')content=plansHTML();
+  else if(prefsPage==='planEdit')content=planEditHTML();
   else if(prefsPage==='categories')content=`<section class="sec"><h3><span>Categories</span><span>${categories().length} total</span></h3>
     <p class="note">Create categories locally, without using AI. Similar names are flagged before they are added.</p>
     <label class="fld"><span>New category</span><input class="in sm" id="p-category-name" data-category-input="1" value="${esc(categoryDraft)}" maxlength="28" placeholder="e.g. Pet care" autocomplete="off"></label>
@@ -1282,7 +1300,7 @@ function route(){const h=location.hash.slice(1),next=VIEWS.includes(h)?h:"today"
   clearTimeout(routeTimer);const main=$("main");
   if(next===view){main.classList.remove("is-leaving");render();return}
   const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const enter=()=>{if(next!=="prefs"&&!eraseBusy&&!categoryBusy){prefsPage="";eraseState=null;categoryEdit=null;categoryOrderDraft=null;backupText=""}view=next;main.classList.remove("is-leaving","is-entering");main.removeAttribute("aria-busy");
+  const enter=()=>{if(next!=="prefs"&&!eraseBusy&&!categoryBusy){prefsPage="";eraseState=null;categoryEdit=null;categoryOrderDraft=null;planDraft=null;backupText=""}view=next;main.classList.remove("is-leaving","is-entering");main.removeAttribute("aria-busy");
     window.scrollTo({top:0,behavior:"instant"});refreshView();
     if(!reduced)requestAnimationFrame(()=>main.classList.add("is-entering"))};
   if(reduced){enter();return}
@@ -1314,7 +1332,7 @@ async function openSheet(id,preset={}){
   if(!dbReady||eraseBusy||categoryBusy)return;
   const e=id?await getEntry(id):null;
   if(id&&!e){toast("Entry not found.");return}
-  sheet={id:e?.id||null,type:e?.type||preset.type||"purchase",name:e?.name||preset.name||"",amt:e?plain(e.amount):"",date:e?.date||preset.date||today(),category:e?.category||"",err:"",armed:false};
+  sheet={id:e?.id||null,type:e?.type||preset.type||"purchase",name:e?.name||preset.name||"",amt:e?plain(e.amount):"",date:e?.date||preset.date||today(),category:e?.category||"",planId:e?.planId||preset.planId||"",err:"",armed:false};
   sheetReturnFocus=document.activeElement;
   document.body.classList.add("dialog-open");renderSheet();
   $("sheet-root").querySelector(".sheet")?.scrollTo(0,0)
@@ -1338,7 +1356,7 @@ function renderSheet(){if(!sheet){closeSheet();return}if(sheet.smart){renderSmar
     <div class="two"><label class="fld amt"><span>Amount</span><input class="in" id="s-amt" data-s="amt" value="${esc(s.amt)}" inputmode="${s.type==="adjustment"?"text":"decimal"}" placeholder="0"><span aria-hidden="true">${cur()}</span></label>
     <label class="fld"><span>Date</span><input class="in" type="date" id="s-date" data-s="date" value="${s.date}" max="${t}"></label></div>
     ${s.type==="purchase"?`<label class="fld"><span>Category</span><select class="in" id="s-cat" data-s="category"><option value="">${s.id?"None":"Sort automatically"}</option>${categories().map(c=>`<option value="${esc(c)}" ${s.category===c?"selected":""}>${esc(c)}</option>`).join("")}</select></label><button type="button" class="link ink" data-sact="custom-category">+ Create a category</button>`:""}
-    <p class="err" role="status">${esc(s.err)}</p>
+    ${s.type!=="repayment"?planField(s.planId,'id="s-plan" data-s="planId"'):""}<p class="err" role="status">${esc(s.err)}</p>
     <div class="acts" style="margin-top:24px">${s.id?`<button type="button" class="link warn" data-sact="delete">${s.armed?"Tap again to delete":"Delete"}</button>`:`<button type="button" class="link" data-sact="cancel">Cancel</button>`}<button type="button" class="btn push" data-sact="save">Save</button></div>
   </div></div>`;syncSheetViewport();if(fid&&fid.startsWith("s-"))$(fid)?.focus({preventScroll:true})}
 async function saveSheet(){const s=sheet;if(!s)return;const allowNeg=s.type==="adjustment",amount=parseMoney(allowNeg?String(s.amt).trim().replace(/^\+/,""):s.amt,allowNeg);let name=s.name.trim();
@@ -1349,6 +1367,7 @@ async function saveSheet(){const s=sheet;if(!s)return;const allowNeg=s.type==="a
   const e=old?{...old}:{id:uid(),created:new Date().toISOString(),category:null,status:"none"};
   const prevName=e.name,prevType=e.type,prevCat=e.category;
   Object.assign(e,{name,amount,date:s.date,type:s.type,updated:new Date().toISOString()});
+  if(s.type!=="repayment"&&planById(s.planId))e.planId=s.planId;else delete e.planId;
   let ask=false,chosen=null;
   if(e.type!=="purchase"){e.category=null;e.status="na"}
   else if(s.category){if(s.category!==prevCat||e.status!=="approved"||norm(prevName)!==norm(name))chosen=s.category}
@@ -1386,12 +1405,14 @@ async function backupJSON(){
   await saveQueue.catch(()=>{});
   const [rows,archive]=await Promise.all([dbAll(),dbRequest(db.transaction("legacyArchive","readonly").objectStore("legacyArchive").get("history"))]);
   const {key,...settings}=S.settings;
-  return JSON.stringify({app:"pocket-ledger",version:2,exported:new Date().toISOString(),
+  return JSON.stringify({app:"pocket-ledger",version:2,plans:S.plans,exported:new Date().toISOString(),
     entries:rows.map(({normalisedName,...e})=>e),dict:S.dict,customCategories:S.customCategories,categoryList:categories(),builtinCategoryMap:S.builtinCategoryMap,octopusCategory:S.octopusCategory,
     ai:{requests:S.ai.requests,cost:S.ai.cost},settings,legacy:archive?.value||{}},null,1)
 }
 function validateBackup(p){
   if(!p||p.app!=="pocket-ledger"||![1,2].includes(p.version)||!Array.isArray(p.entries))throw Error("That file isn't a valid Pocket Ledger backup.");
+  if(p.plans!=null&&!validPlans(p.plans))throw Error("Invalid plans in backup.");
+  const planIds=new Set((p.plans||[]).map(p=>p.id));
   const importedCategories=Array.isArray(p.customCategories)?p.customCategories:[];
   if(importedCategories.length>42||!importedCategories.every(x=>typeof x==="string"&&x.length>=2&&x.length<=28)||
     new Set(importedCategories.map(categoryKey)).size!==importedCategories.length)throw Error("Invalid custom categories.");
@@ -1401,7 +1422,7 @@ function validateBackup(p){
     if(!e||typeof e.id!=="string"||!/^[a-zA-Z0-9_-]{1,80}$/.test(e.id)||ids.has(e.id)||
       typeof e.name!=="string"||e.name.length>80||!validDate(e.date)||!Number.isSafeInteger(e.amount)||
       (e.type==="adjustment"?e.amount===0:e.amount<=0)||!types.includes(e.type)||
-      (e.category!=null&&!validCategories.includes(e.category))||!statuses.includes(e.status)||
+      (e.category!=null&&!validCategories.includes(e.category))||(e.planId!=null&&e.planId!==""&&!planIds.has(e.planId))||!statuses.includes(e.status)||
       typeof e.created!=="string"||Number.isNaN(Date.parse(e.created)))throw Error("Some entries are invalid. Nothing was imported.");
     ids.add(e.id)
   }
@@ -1414,7 +1435,7 @@ async function importData(text,mode="merge"){
   const d=defaults(),opts=p.settings||{},ai=p.ai||{},key=S.settings.key;
   const imported=Array.isArray(p.customCategories)?p.customCategories:[];
   const importedList=p.categoryList||defaultCategoryList(imported);
-  let newState={...d,dict:p.dict||{},customCategories:imported,categoryList:importedList,builtinCategoryMap:categoryAliases(importedList,p.builtinCategoryMap),octopusCategory:p.octopusCategory,aiResults:{},ai:{requests:Number.isSafeInteger(ai.requests)&&ai.requests>=0?ai.requests:0,cost:Number.isFinite(ai.cost)&&ai.cost>=0?ai.cost:0,lastError:""},
+  let newState={...d,plans:p.plans||[],dict:p.dict||{},customCategories:imported,categoryList:importedList,builtinCategoryMap:categoryAliases(importedList,p.builtinCategoryMap),octopusCategory:p.octopusCategory,aiResults:{},ai:{requests:Number.isSafeInteger(ai.requests)&&ai.requests>=0?ai.requests:0,cost:Number.isFinite(ai.cost)&&ai.cost>=0?ai.cost:0,lastError:""},
     settings:{...d.settings,...opts,key,cycleStart:validCycleStart(opts.cycleStart)?opts.cycleStart:1}};
   let archive=p.version===2?p.legacy||{}:{card:p.card||[],recon:p.recon||{}};
   try{
@@ -1428,9 +1449,10 @@ async function importData(text,mode="merge"){
         if(union.length>=43)throw Error("Too many categories after merging. Merge similar categories first.");
         union.splice(union.length-1,0,cat);mapping.set(cat,cat)
       }
-      const incoming=p.entries.filter(e=>!ids.has(e.id)).map(e=>{if(!e.category)return e;const to=mapping.get(e.category)??null;return to===e.category?e:reviseCategoryRecord(e,e.category,to)});
+      const pm=mergedPlans(S.plans,p.plans||[]);
+      const incoming=p.entries.filter(e=>!ids.has(e.id)).map(e=>{const row={...e};if(row.planId)row.planId=pm.mapping.get(row.planId);if(!row.category)return row;const to=mapping.get(row.category)??null;return to===row.category?row:reviseCategoryRecord(row,row.category,to)});
       const incomingDict=Object.fromEntries(Object.entries(p.dict||{}).filter(([k,v])=>typeof k==="string"&&mapping.get(v)).map(([k,v])=>[k,mapping.get(v)]));
-      newState=syncCustomCategories({...stateSnapshot(),categoryList:union,octopusCategory:octopusCategory()||mapping.get(p.octopusCategory)||findOctopusCategory(union),dict:{...S.dict,...incomingDict},aiResults:{}});
+      newState=syncCustomCategories({...stateSnapshot(),plans:pm.plans,categoryList:union,octopusCategory:octopusCategory()||mapping.get(p.octopusCategory)||findOctopusCategory(union),dict:{...S.dict,...incomingDict},aiResults:{}});
       await dbWrite(["entries","app"],tx=>{const store=tx.objectStore("entries");for(const e of incoming)store.add(recordFor(e));
         tx.objectStore("app").put({key:"current",value:structuredClone(newState)})});
       normaliseState(newState);aiCache.clear();queryPlans.clear();await refreshView();toast(`Imported ${incoming.length} new entries. Skipped ${p.entries.length-incoming.length} duplicates.`)
@@ -1446,8 +1468,8 @@ async function exportCSV(){
   if(framed){toast("Downloads are blocked in preview.");return}
   const {from,to}=receiptBounds();if(from>to){toast("Choose a valid date range.");return}
   try{const rows=(await dbRange({from,to})).entries;
-    const lines=[["Date","Name","Category","Amount","Currency","Type","ID"],...rows.map(e=>[
-      e.date,e.name,e.category||"",plain(e.amount),S.settings.currency,e.type,e.id])];
+    const lines=[["Date","Name","Category","Amount","Currency","Type","ID","Plan","Budget scope"],...rows.map(e=>[
+      e.date,e.name,e.category||"",plain(e.amount),S.settings.currency,e.type,e.id,planById(e.planId)?.name||"",isSeparate(e)?"Separate plan":"Everyday"])];
     const csv="\ufeff"+lines.map(row=>row.map(csvField).join(",")).join("\r\n");
     saveDownload(csv,`pocket-ledger-${from}-to-${to}.csv`,"text/csv;charset=utf-8");toast(`Exported ${rows.length} entries.`)
   }catch(err){toast("Export failed: "+err.message)}
@@ -1522,13 +1544,13 @@ function validateCapture(j){
     if(!name||name.length>40||!aiDate(date)||typeof amount!=='number'||!Number.isSafeInteger(amount)||amount<=0)throw Error('A suggested entry has an invalid date, name or amount. Check the text and try again.');
     return {name,date,amount,category:categories().includes(e.category)?e.category:''};});
 }
-function prepareCapture(rows){return rows.map(row=>{const e={...row,type:'purchase',category:null,status:'none'};categorize(e);return {...row,category:octopusLabelKind(row.name)?(e.category||''):(e.category||row.category||''),amt:plain(row.amount)}})}
+function prepareCapture(rows){return rows.map(row=>{const e={...row,type:'purchase',category:null,status:'none'};categorize(e);return {...row,planId:sheet?.planId||"",category:octopusLabelKind(row.name)?(e.category||''):(e.category||row.category||''),amt:plain(row.amount)}})}
 function captureCategoryLabel(row){return row.category||(aiReady()?"Auto classify after saving":"Needs category")}
 function entryModes(smart){return `<div class="entry-modes" role="group" aria-label="Input mode"><button type="button" data-sact="smart-back" aria-pressed="${!smart}">Manual</button><button type="button" data-sact="smart-open" aria-pressed="${smart}">${aiMark} Smart capture</button></div>`}
 function renderSmartSheet(){const s=sheet;if(!s?.smart)return;const f=s.smart,rows=f.rows||[],review=f.stage==="review";
   const old=$("sheet-root").querySelector(".sheet"),oldScroll=old?.scrollTop||0,oldStage=old?.dataset.stage;
   const total=rows.reduce((a,r)=>a+(parseMoney(r.amt)||0),0);
-  const fields=(r,i)=>`<details class="capture-entry"${f.invalid===i?" open":""}><summary><span class="capture-entry-label"><strong>${esc(r.name||"Unnamed expense")}</strong><small>${esc(captureCategoryLabel(r))} · ${esc(validDate(r.date)?(r.date===today()?"Today":shortDate(r.date)):"Choose date")}</small></span><span class="capture-entry-price">${money(parseMoney(r.amt)||0)}</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></summary><div class="capture-entry-fields"><label class="fld"><span>Name</span><input class="in" data-smart-i="${i}" data-smart-field="name" ${f.saving?"disabled":""} value="${esc(r.name)}" maxlength="40"></label><div class="two"><label class="fld"><span>Amount (${cur()})</span><input class="in" data-smart-i="${i}" data-smart-field="amt" ${f.saving?"disabled":""} inputmode="decimal" value="${esc(r.amt)}"></label><label class="fld"><span>Date</span><input class="in" data-smart-i="${i}" data-smart-field="date" ${f.saving?"disabled":""} type="date" value="${esc(r.date)}" max="${today()}"></label></div><label class="fld"><span>Category</span><select class="in" data-smart-i="${i}" data-smart-field="category" ${f.saving?"disabled":""}><option value="">Sort automatically</option>${categories().map(c=>`<option value="${esc(c)}" ${c===r.category?"selected":""}>${esc(c)}</option>`).join("")}</select></label><button type="button" class="link warn" data-sact="smart-remove" data-i="${i}" ${f.busy?"disabled":""}>Remove entry</button></div></details>`;
+  const fields=(r,i)=>`<details class="capture-entry"${f.invalid===i?" open":""}><summary><span class="capture-entry-label"><strong>${esc(r.name||"Unnamed expense")}</strong><small>${esc(captureCategoryLabel(r))} · ${esc(validDate(r.date)?(r.date===today()?"Today":shortDate(r.date)):"Choose date")}</small></span><span class="capture-entry-price">${money(parseMoney(r.amt)||0)}</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></summary><div class="capture-entry-fields"><label class="fld"><span>Name</span><input class="in" data-smart-i="${i}" data-smart-field="name" ${f.saving?"disabled":""} value="${esc(r.name)}" maxlength="40"></label><div class="two"><label class="fld"><span>Amount (${cur()})</span><input class="in" data-smart-i="${i}" data-smart-field="amt" ${f.saving?"disabled":""} inputmode="decimal" value="${esc(r.amt)}"></label><label class="fld"><span>Date</span><input class="in" data-smart-i="${i}" data-smart-field="date" ${f.saving?"disabled":""} type="date" value="${esc(r.date)}" max="${today()}"></label></div><label class="fld"><span>Category</span><select class="in" data-smart-i="${i}" data-smart-field="category" ${f.saving?"disabled":""}><option value="">Sort automatically</option>${categories().map(c=>`<option value="${esc(c)}" ${c===r.category?"selected":""}>${esc(c)}</option>`).join("")}</select></label>${planField(r.planId,`data-smart-i="${i}" data-smart-field="planId" ${f.saving?"disabled":""}`)}<button type="button" class="link warn" data-sact="smart-remove" data-i="${i}" ${f.busy?"disabled":""}>Remove entry</button></div></details>`;
   $("sheet-root").innerHTML=`<div class="scrim"><section class="sheet smart-sheet" data-stage="${review?"review":"input"}" role="dialog" aria-modal="true" aria-label="Smart capture"><header class="capture-sheet-header"><h3 class="entry-sheet-title">${review?"Review expenses":"New expense"}</h3><button type="button" class="capture-close" aria-label="Close" data-sact="smart-close" ${f.saving?"disabled":""}>×</button></header>
   ${!review?entryModes(true):""}
   <div class="capture-step"><span class="${!review?"active":""}">1 · Enter</span><span class="capture-step-divider"></span><span class="${review?"active":""}">2 · Review</span></div>
@@ -1544,6 +1566,7 @@ async function smartParse(remote){const s=sheet,f=s?.smart;if(!f||f.busy)return;
 async function smartSave(){const s=sheet,f=s?.smart;if(!f||f.busy||!f.rows?.length)return;let rows;const needsAI=[];
   try{rows=f.rows.map((r,i)=>{const amount=parseMoney(r.amt),name=r.name.trim();if(!name||name.length>40||amount===null||!aiDate(r.date)||r.category&&!categories().includes(r.category)){f.invalid=i;throw Error('Check entry '+(i+1)+': name, amount, date and category.')}
     const e={id:uid(),name,amount,date:r.date,created:new Date().toISOString(),type:'purchase',category:r.category||null,status:r.category?'approved':'none'};
+    if(planById(r.planId))e.planId=r.planId;
     if(!e.category&&categorize(e))needsAI.push(e.id);
     return e;
   })}catch(e){f.error=e.message;renderSmartSheet();return}
@@ -1654,24 +1677,25 @@ function askHTML(){const result=askResult,p=result?.p;let answer='';
 }
 /* Overview: compare equal elapsed portions of consecutive cycles and forecast locally. */
 function forecastFor(m,ref,current,history){const elapsed=daysBetween(m.first,ref),remaining=Math.max(0,daysBetween(ref,m.last)-1),byDay=Array(7).fill(0),days=Array(7).fill(0),seen=new Set();let walletHistory=0;
+  const actual=budgetSpent(current);
   for(let i=0;i<56;i++){const d=addDays(m.first,-56+i);days[toDate(d).getDay()]++}
-  for(const e of history){if(!SPEND.has(e.type))continue;if(octopusRecordKind(e))walletHistory+=e.amount;else byDay[toDate(e.date).getDay()]+=e.amount;if(e.type==='purchase'||e.type==='unknown')seen.add(e.date)}
-  if(remaining===0)return {amount:current.spent,method:'Financial month ends today; excludes any unlogged expenses.'};
-  if(seen.size>=21){let future=0;for(let i=1;i<=remaining;i++){const d=toDate(addDays(ref,i)).getDay();future+=Math.max(0,byDay[d]/days[d])}future+=Math.max(0,walletHistory/56)*remaining;return {amount:Math.round(current.spent+future),method:'Based on the previous eight weeks by weekday, with Octopus payments averaged over the full period, plus recorded spending this month.'}}
-  if(elapsed>=3&&current.count>=3)return {amount:Math.round(current.spent+Math.max(0,current.spent/elapsed)*remaining),method:'Based on recorded spending so far and the remaining calendar days.'};
+  for(const e of history){if(!SPEND.has(e.type)||isSeparate(e))continue;if(octopusRecordKind(e))walletHistory+=e.amount;else byDay[toDate(e.date).getDay()]+=e.amount;if(e.type==='purchase'||e.type==='unknown')seen.add(e.date)}
+  if(remaining===0)return {amount:actual,method:'Financial month ends today; excludes any unlogged expenses.'};
+  if(seen.size>=21){let future=0;for(let i=1;i<=remaining;i++){const d=toDate(addDays(ref,i)).getDay();future+=Math.max(0,byDay[d]/days[d])}future+=Math.max(0,walletHistory/56)*remaining;return {amount:Math.round(actual+future),method:'Based on the previous eight weeks by weekday, with Octopus payments averaged over the full period, plus recorded spending this month.'}}
+  if(elapsed>=3&&current.count>=3)return {amount:Math.round(actual+Math.max(0,actual/elapsed)*remaining),method:'Based on recorded spending so far and the remaining calendar days.'};
   return null;
 }
 // Use bounded local history windows, never transaction labels or individual records in the AI payload.
 function insightWindow(rows,from,to){
-  const dates=new Set(),categoryTotals=Object.create(null),categoryRecords=Object.create(null);let spending=0,recordCount=0,unknown=0,adjustments=0,walletAmount=0,explicitTopups=0,walletCount=0;
-  for(const e of rows){if(e.date<from||e.date>to||!SPEND.has(e.type))continue;spending+=e.amount;recordCount++;
+  const dates=new Set(),categoryTotals=Object.create(null),categoryRecords=Object.create(null);let spending=0,recordCount=0,unknown=0,adjustments=0,walletAmount=0,explicitTopups=0,walletCount=0,separateSpent=0;
+  for(const e of rows){if(e.date<from||e.date>to||!SPEND.has(e.type))continue;spending+=e.amount;recordCount++;if(isSeparate(e))separateSpent+=e.amount;
     if(e.type==='purchase'||e.type==='unknown')dates.add(e.date);
     if(e.type==='unknown')unknown+=e.amount;
     if(e.type==='adjustment')adjustments+=e.amount;
-    if(e.type==='purchase'){const k=e.category||'Uncategorised';categoryTotals[k]=(categoryTotals[k]||0)+e.amount;const p=categoryRecords[k]||(categoryRecords[k]={count:0,largest:0,dates:new Set(),walletAmount:0,explicitTopups:0});p.count++;p.largest=Math.max(p.largest,e.amount);p.dates.add(e.date);const kind=octopusRecordKind(e);if(kind){walletAmount+=e.amount;walletCount++;p.walletAmount+=e.amount;if(kind==='topup'){explicitTopups+=e.amount;p.explicitTopups+=e.amount}}}
+    if(e.type==='purchase'){const k=e.category||'Uncategorised';categoryTotals[k]=(categoryTotals[k]||0)+e.amount;const p=categoryRecords[k]||(categoryRecords[k]={count:0,largest:0,dates:new Set(),walletAmount:0,explicitTopups:0,separateAmount:0});if(isSeparate(e))p.separateAmount+=e.amount;p.count++;p.largest=Math.max(p.largest,e.amount);p.dates.add(e.date);const kind=octopusRecordKind(e);if(kind){walletAmount+=e.amount;walletCount++;p.walletAmount+=e.amount;if(kind==='topup'){explicitTopups+=e.amount;p.explicitTopups+=e.amount}}}
   }
   const days=daysBetween(from,to);
-  return {from,to,days,spending,recordedDays:dates.size,recordCount,unknown,adjustments,walletAmount,explicitTopups,walletCount,categoryTotals,categoryRecords,
+  return {from,to,days,spending,recordedDays:dates.size,recordCount,unknown,adjustments,walletAmount,explicitTopups,walletCount,separateSpent,categoryTotals,categoryRecords,
     enoughEvidence:days>=3&&dates.size>=Math.max(3,Math.ceil(days/2))};
 }
 async function overviewAnalytics(m,ref){
@@ -1692,14 +1716,14 @@ async function overviewAnalytics(m,ref){
 function insightPayload(a){
   const pct=(n,d)=>d>0?Math.round(n/d*100):null,m=cycleBounds(a.to);
   const elapsed=daysBetween(a.from,a.to),totalDays=daysBetween(a.from,m.last),daysLeft=Math.max(1,daysBetween(a.to,m.last));
-  const budget=S.settings.budget||0,remaining=budget-a.current.spent,allowance=Math.floor(Math.max(0,remaining)/daysLeft),h=a.horizons;
+  const everyday=budgetSpent(a.current),budget=S.settings.budget||0,remaining=budget-everyday,allowance=Math.floor(Math.max(0,remaining)/daysLeft),h=a.horizons;
   const windowSummary=w=>({from:w.from,to:w.to,calendar_days:w.days,days_with_purchase_or_unknown_records:w.recordedDays,
-    ledger_record_count:w.recordCount,recorded_total:money(w.spending),recorded_daily_average:money(Math.round(w.spending/w.days)),
+    ledger_record_count:w.recordCount,recorded_total:money(w.spending),everyday_recorded:money(w.spending-(w.separateSpent||0)),separate_planned_recorded:money(w.separateSpent||0),recorded_daily_average:money(Math.round(w.spending/w.days)),
     unnamed_spending:money(w.unknown||0),adjustments:money(w.adjustments||0),octopus_mixed_or_topup_amount_already_in_total:money(w.walletAmount||0),explicit_topups_subset:money(w.explicitTopups||0),non_octopus_recorded_amount:money(w.spending-(w.walletAmount||0)),
     evidence:w.enoughEvidence?'usable_for_recorded_period_comparison':'limited_recording_day_coverage'});
   const comparable=(now,prev)=>Boolean(now?.enoughEvidence&&prev?.enoughEvidence&&now.days===prev.days);
   const comparison=(now,prev)=>comparable(now,prev)?{current:windowSummary(now),previous:windowSummary(prev),
-    change:money(now.spending-prev.spending,{sign:true}),percentage_change:pct(now.spending-prev.spending,prev.spending)}:null;
+    change:money(now.spending-prev.spending,{sign:true}),everyday_change:money((now.spending-(now.separateSpent||0))-(prev.spending-(prev.separateSpent||0)),{sign:true}),percentage_change:pct(now.spending-prev.spending,prev.spending)}:null;
   const shortTerm=h?comparison(h.recent,h.beforeRecent):null;
   const mediumTerm=h&&a.comparable?comparison(h.currentWindow,h.previousWindow):null;
   const longTerm=h?.completedWindows?.slice(0,3)||[];
@@ -1716,12 +1740,12 @@ function insightPayload(a){
   for(const w of reliableMonths)for(const k of Object.keys(w.categoryTotals))categoryNames.add(k);
   const catComparison=(name,now,prev)=>{
     const x=now.categoryTotals[name]||0,y=prev.categoryTotals[name]||0;if(!x&&!y)return null;
-    return {current_recorded:money(x),previous_recorded:money(y),difference:money(x-y,{sign:true}),percentage_change:pct(x-y,y),current_octopus_subset:money(now.categoryRecords?.[name]?.walletAmount||0),previous_octopus_subset:money(prev.categoryRecords?.[name]?.walletAmount||0),current_excluding_octopus:money(x-(now.categoryRecords?.[name]?.walletAmount||0)),previous_excluding_octopus:money(y-(prev.categoryRecords?.[name]?.walletAmount||0))};
+    return {current_recorded:money(x),previous_recorded:money(y),difference:money(x-y,{sign:true}),percentage_change:pct(x-y,y),current_separate_plan_subset:money(now.categoryRecords?.[name]?.separateAmount||0),previous_separate_plan_subset:money(prev.categoryRecords?.[name]?.separateAmount||0),current_octopus_subset:money(now.categoryRecords?.[name]?.walletAmount||0),previous_octopus_subset:money(prev.categoryRecords?.[name]?.walletAmount||0),current_excluding_octopus:money(x-(now.categoryRecords?.[name]?.walletAmount||0)),previous_excluding_octopus:money(y-(prev.categoryRecords?.[name]?.walletAmount||0))};
   };
   const categoryContext=[...categoryNames].sort((x,y)=>x.localeCompare(y)).map(category=>{
     const amount=a.current.categories?.[category]||0,p=current?.categoryRecords?.[category];
-    const historic=reliableMonths.length>=2?reliableMonths.map(w=>({recorded:money(w.categoryTotals[category]||0),per_calendar_day:money(Math.round((w.categoryTotals[category]||0)/w.days)),octopus_subset:money(w.categoryRecords?.[category]?.walletAmount||0)})):null;
-    return {category,financial_month_to_date:{recorded_amount:money(amount),share_of_categorised_and_uncategorised_purchase_amount_percentage:pct(amount,categoryTotal),
+    const historic=reliableMonths.length>=2?reliableMonths.map(w=>({recorded:money(w.categoryTotals[category]||0),per_calendar_day:money(Math.round((w.categoryTotals[category]||0)/w.days)),separate_plan_subset:money(w.categoryRecords?.[category]?.separateAmount||0),octopus_subset:money(w.categoryRecords?.[category]?.walletAmount||0)})):null;
+    return {category,financial_month_to_date:{recorded_amount:money(amount),separate_plan_subset:money(p?.separateAmount||0),everyday_recorded_amount:money(amount-(p?.separateAmount||0)),share_of_categorised_and_uncategorised_purchase_amount_percentage:pct(amount,categoryTotal),
       ledger_record_count:p?.count??0,days_with_category_records:p?.dates.size??0,octopus_amount_already_in_category:money(p?.walletAmount||0),explicit_octopus_topups_subset:money(p?.explicitTopups||0),recorded_amount_excluding_octopus:money(amount-(p?.walletAmount||0)),
       mean_amount_per_ledger_record:p?.count?money(Math.round(amount/p.count)):null,
       largest_record_amount:p?.count?money(p.largest):null,largest_record_share_of_category_percentage:p?.count?pct(p.largest,amount):null},
@@ -1729,33 +1753,34 @@ function insightPayload(a){
       matched_financial_month_comparison:mediumTerm?catComparison(category,h.currentWindow,h.previousWindow):null,
       completed_months_most_recent_first:historic};
   });
-  const pacing=budget>0?{financial_month_budget:money(budget),budget_remaining:money(remaining),budget_used_percentage:pct(a.current.spent,budget),
-    elapsed_calendar_day_percentage:pct(elapsed,totalDays),difference_from_even_calendar_budget_pace:money(a.current.spent-Math.round(budget*elapsed/totalDays),{sign:true}),
+  const pacing=budget>0?{everyday_budget_target:money(budget),everyday_recorded_spending:money(everyday),budget_remaining:money(remaining),budget_used_percentage:pct(everyday,budget),
+    elapsed_calendar_day_percentage:pct(elapsed,totalDays),difference_from_even_calendar_budget_pace:money(everyday-Math.round(budget*elapsed/totalDays),{sign:true}),
     remaining_daily_allowance_including_today:money(allowance),next_seven_days_allowance_including_today:daysLeft>=7&&remaining>=0?money(allowance*7):null,
     already_over_budget:remaining<0}:null;
-  const scenario=budget>0&&daysLeft>=7&&h?.recent.enoughEvidence&&h.recent.spending>=0?
-    {condition:'If the next seven days of additional recorded spending, including any further spending today, equal the total of the last seven completed days.',
-      additional_spending:money(h.recent.spending),remaining_budget_afterwards:money(remaining-h.recent.spending),
+  const recentEveryday=h?h.recent.spending-(h.recent.separateSpent||0):0;
+  const scenario=budget>0&&daysLeft>=7&&h?.recent.enoughEvidence&&recentEveryday>=0?
+    {condition:'If the next seven days of additional everyday recorded spending equal everyday recorded spending in the last seven completed days.',
+      additional_spending:money(recentEveryday),remaining_budget_afterwards:money(remaining-recentEveryday),
       remaining_calendar_days_after_scenario:daysLeft-7,
-      daily_allowance_afterwards:daysLeft>7&&remaining-h.recent.spending>=0?money(Math.floor((remaining-h.recent.spending)/(daysLeft-7))):null,
+      daily_allowance_afterwards:daysLeft>7&&remaining-recentEveryday>=0?money(Math.floor((remaining-recentEveryday)/(daysLeft-7))):null,
       is_illustration_not_prediction:true,usage:'Optional stress test only. Repeating a recorded week is not an expected event, and budget overshoot is not a cash shortfall.'}:null;
-  const forecast=a.forecast?{estimated_full_financial_month_spending:money(a.forecast.amount),method:a.forecast.method,
+  const forecast=a.forecast?{estimated_full_financial_month_everyday_spending:money(a.forecast.amount),method:a.forecast.method,
     evidence:a.forecast.method.startsWith('Based on the previous eight weeks')?'historical_weekday_estimate':a.forecast.method.startsWith('Based on recorded spending')?'simple_current_pace_extrapolation':'end_of_period_recorded_total'}:null;
   return {currency:S.settings.currency,current_financial_month:{from:a.from,as_of:a.to,end:m.last,elapsed_calendar_days_including_today:elapsed,
     remaining_calendar_days_including_today:daysLeft,total_calendar_days:totalDays,recorded_spending:money(a.current.spent),recording_context:current?windowSummary(current):null},
-    budget_position:pacing,short_term:{recent:h?windowSummary(h.recent):null,comparison:shortTerm},
+    budget_position:pacing,plans_context:{total_recorded:money(a.current.spent),everyday_recorded:money(everyday),separate_planned_recorded:money(a.current.separateSpent||0),active_plan_count:S.plans.filter(p=>!p.archived).length,meaning:'Separate plan amounts are already included in total and categories, but excluded from the everyday target. Plan membership is user assigned. No proof of available funds or future payment timing. Names of plans are not shared.'},short_term:{recent:h?windowSummary(h.recent):null,comparison:shortTerm},
     medium_term_same_elapsed_financial_month_comparison:mediumTerm,
     longer_term:{completed_financial_months_most_recent_first:longTerm.map(windowSummary),months_used_for_category_history:reliableMonths.length>=2?reliableMonths.length:0},
     category_context:categoryContext,octopus_context:{category:octopusCategory(),current_recorded_amount_already_in_total:money(current?.walletAmount||0),explicit_topups_subset:money(current?.explicitTopups||0),interpretation:OCTOPUS_GUIDE+' Wallet amounts are already included in total spending and any associated category. Never add them again. Actual wallet balance, item-level purchases, dates of use and remaining funded days are unknown.'},overall_spending_concentration:concentration,conditional_seven_day_budget_scenario:scenario,forecast,
-    budget_scope:'There is one overall financial-month spending budget. No category budgets, income, available cash, debt obligations, planned purchases or upcoming essential costs are supplied. An exceeded spending budget is not evidence of insolvency or inability to pay for necessities.',
+    budget_scope:'The financial-month target covers everyday expenses including plans not marked separate. Separate plans are explicitly user allocated, not evidence of affordability. No category budgets, income, cash balances, debt obligations or future essential costs are supplied. An exceeded spending budget is not evidence of insolvency or inability to pay for necessities.',
     data_semantics:'Ledger records are manually logged amounts and can combine multiple purchases, top-ups, bills or future consumption. A record is not a meal, ride, item or day of use. Category totals and changes describe recorded amounts, not consumption, necessity or behavioural causes. Calendar day coverage is a rough comparison screen, not proof of completeness. Today is incomplete; zero recorded spending is not proof of no spending. Current budget is not historical budget. Category share uses purchase amounts only, excluding unknown-name records and adjustments. Historical category values align with the usable completed months, newest first. Missing comparisons mean insufficient evidence.'};
 }
-const insightKey=a=>JSON.stringify(['insights-wallet-v10',S.settings.insightLanguage,S.settings.model,insightPayload(a)]);
+const insightKey=a=>JSON.stringify(['insights-plans-v11',S.settings.insightLanguage,S.settings.model,insightPayload(a)]);
 function insightsHTML(){const a=DATA.analytics;if(!a)return '';const p=a.previous,c=a.current,diff=c.spent-p.spent,percent=a.comparable&&p.spent>0?Math.round(diff/p.spent*100):null;
   const cache=S.insightCache,hit=cache&&cache.key===insightKey(a)&&typeof cache.text==='string';const top=Object.entries(c.categories).sort((x,y)=>y[1]-x[1])[0];
-  return `<section class="sec"><h3><span>Spending forecast</span><span>Estimate</span></h3>${a.forecast?`<strong class="smart-number">${money(a.forecast.amount)}</strong><p class="note">${esc(a.forecast.method)} ${a.forecast.amount>S.settings.budget?'Above your current budget.':'Within your current budget.'} Estimates recorded payments, not actual consumption. Octopus funding dates may differ from use dates; excludes unknown future bills.</p>`:'<p class="note">Not enough recorded spending yet for a useful estimate.</p>'}</section><section class="sec"><h3><span>${aiMark} Spending insights</span><button type="button" class="link ink" data-act="insight-run" ${insightsBusy||!c.count?'disabled':''}>${insightsBusy?'Generating…':hit?'Regenerate':'Generate insights'}</button></h3>${a.comparable?`<div class="line"><span>Same elapsed period last month<small>${esc(a.previousFrom)} to ${esc(a.previousTo)}</small></span><strong>${money(p.spent)}</strong></div><div class="line"><span>Recorded this month<small>${esc(a.from)} to ${esc(a.to)}</small></span><strong>${money(c.spent)}</strong></div><p class="note">${money(diff,{sign:true})}${percent!==null?' · '+Math.abs(percent)+'% '+(percent>0?'higher':percent<0?'lower':'change'):''}</p>`:'<p class="note">No comparable prior period with entries yet.</p>'}${top?`<p class="note">Largest category so far: ${esc(top[0])} · ${money(top[1])}.</p>`:''}<p class="note">AI receives only these aggregated figures, not receipt names or individual transactions.</p>${hit?`<div class="smart-result"><p class="smart-report">${esc(cache.text)}</p><p class="note">Saved insight · ${esc(cache.date||'')}</p></div>`:''}${insightsError?`<p class="err" role="status">${esc(insightsError)}</p>`:''}</section>`
+  return `<section class="sec"><h3><span>Everyday spending forecast</span><span>Estimate</span></h3>${a.forecast?`<strong class="smart-number">${money(a.forecast.amount)}</strong><p class="note">${esc(a.forecast.method)} ${S.settings.budget?(a.forecast.amount>S.settings.budget?'Above the everyday target.':'Within the everyday target.'):'No everyday target set.'} Excludes separate plans. Estimates recorded payments, not actual consumption. Octopus funding dates may differ from use dates; excludes unknown future bills.</p>`:'<p class="note">Not enough recorded spending yet for a useful estimate.</p>'}</section><section class="sec"><h3><span>${aiMark} Spending insights</span><button type="button" class="link ink" data-act="insight-run" ${insightsBusy||!c.count?'disabled':''}>${insightsBusy?'Generating…':hit?'Regenerate':'Generate insights'}</button></h3>${a.comparable?`<div class="line"><span>Same elapsed period last month<small>${esc(a.previousFrom)} to ${esc(a.previousTo)}</small></span><strong>${money(p.spent)}</strong></div><div class="line"><span>Recorded this month<small>${esc(a.from)} to ${esc(a.to)}</small></span><strong>${money(c.spent)}</strong></div><p class="note">${money(diff,{sign:true})}${percent!==null?' · '+Math.abs(percent)+'% '+(percent>0?'higher':percent<0?'lower':'change'):''}</p>`:'<p class="note">No comparable prior period with entries yet.</p>'}${top?`<p class="note">Largest category so far: ${esc(top[0])} · ${money(top[1])}.</p>`:''}<p class="note">AI receives only these aggregated figures, not receipt names or individual transactions.</p>${hit?`<div class="smart-result"><p class="smart-report">${esc(cache.text)}</p><p class="note">Saved insight · ${esc(cache.date||'')}</p></div>`:''}${insightsError?`<p class="err" role="status">${esc(insightsError)}</p>`:''}</section>`
 }
-async function generateInsights(){const a=DATA.analytics;if(!a||insightsBusy||!a.current.count)return;const key=insightKey(a);insightsBusy=true;insightsError='';render();try{const j=await smartRemote('You are a perceptive personal spending analyst. '+INSIGHT_LANGUAGES[S.settings.insightLanguage].guide+' Write two or three natural short paragraphs. The purpose is to help the reader understand their spending, not to manage or police it. Find one or two non-obvious observations by connecting the supplied figures across time periods, categories, overall concentration or budget context. Explain their significance. Prefer a genuinely useful contrast over repeating dashboard totals. Octopus is a mixed stored-value category, not Transport. Read octopus_context and wallet subsets before interpreting category or daily changes. Treat top-up dates as recorded funding dates, never actual dates of consumption; the amount is already included in the budget. Distinguish recorded cash outflow from actual use, and never infer daily wallet consumption, available wallet balance or a transport share. Historical Octopus records may have been assigned to other categories; their separately supplied subsets must not be interpreted as that category usage. The non-Octopus subtotal is descriptive, not a new budget balance or a measure of actual consumption. Avoid treating top-up dates as consumption trends. A large payment can explain the shape of recorded spending without proving a bad habit; a record is not a meal, trip or item. Do not infer frequency of consumption, recurrence, necessity or payment purpose. Distinguish observed changes from hypotheses; avoid speculative explanations that add no information. Consider stable or improved recorded patterns as well as pressure, with understated recognition when earned. All categories share one budget; never invent category budgets, spending bans, planned purchases or rules about what the reader should buy. The remaining daily allowance describes the budget, not the readers ability to afford life. Forecasts and stress tests are optional context, not predicted outcomes or threats. Never equate overshooting a budget with running out of money or being unable to pay for essentials. There is no mandatory recommendation, checklist, question or closing action. Offer a brief, proportionate option only if it follows from an actual finding and adds value; otherwise end with the insight itself. Do not tell the reader to check whether each category is finished for the month, earmark imagined bills or repeatedly restate allowance. When evidence is limited, make the best supported descriptive observation instead of generic advice. Use only supplied numerical figures, exactly as formatted; no new calculations. No headings, JSON, tables, preambles, forced praise or alarmist wording.',insightPayload(a),'text');S.insightCache={key,text:j,date:today()};await persist()}catch(e){insightsError=e.message}finally{insightsBusy=false;render()}}
+async function generateInsights(){const a=DATA.analytics;if(!a||insightsBusy||!a.current.count)return;const key=insightKey(a);insightsBusy=true;insightsError='';render();try{const j=await smartRemote('You are a perceptive personal spending analyst. '+INSIGHT_LANGUAGES[S.settings.insightLanguage].guide+' Write two or three natural short paragraphs. The purpose is to help the reader understand their spending, not to manage or police it. Find one or two non-obvious observations by connecting the supplied figures across time periods, categories, overall concentration or budget context. Explain their significance. Prefer a genuinely useful contrast over repeating dashboard totals. Octopus is a mixed stored-value category, not Transport. Read octopus_context and wallet subsets before interpreting category or daily changes. Treat top-up dates as recorded funding dates, never actual dates of consumption; the amount is already included in the budget. Distinguish recorded cash outflow from actual use, and never infer daily wallet consumption, available wallet balance or a transport share. Historical Octopus records may have been assigned to other categories; their separately supplied subsets must not be interpreted as that category usage. The non-Octopus subtotal is descriptive, not a new budget balance or a measure of actual consumption. Avoid treating top-up dates as consumption trends. A large payment can explain the shape of recorded spending without proving a bad habit; a record is not a meal, trip or item. Do not infer frequency of consumption, recurrence, necessity or payment purpose. Distinguish observed changes from hypotheses; avoid speculative explanations that add no information. Consider stable or improved recorded patterns as well as pressure, with understated recognition when earned. Use plans_context to separate everyday target performance from all recorded outflow. A separate plan payment is not everyday overspending; never imply it is affordable or ignore it in total spending. Budget targets are flexible references, not pass/fail scores. Forecast and stress-test figures refer to everyday outflow only. Never invent category budgets, spending bans, planned purchases or rules about what the reader should buy. The remaining daily allowance describes the budget, not the readers ability to afford life. Forecasts and stress tests are optional context, not predicted outcomes or threats. Never equate overshooting a budget with running out of money or being unable to pay for essentials. There is no mandatory recommendation, checklist, question or closing action. Offer a brief, proportionate option only if it follows from an actual finding and adds value; otherwise end with the insight itself. Do not tell the reader to check whether each category is finished for the month, earmark imagined bills or repeatedly restate allowance. When evidence is limited, make the best supported descriptive observation instead of generic advice. Use only supplied numerical figures, exactly as formatted; no new calculations. No headings, JSON, tables, preambles, forced praise or alarmist wording.',insightPayload(a),'text');S.insightCache={key,text:j,date:today()};await persist()}catch(e){insightsError=e.message}finally{insightsBusy=false;render()}}
 /* Smart Review: bounded local checks, no automated edits or API requests. */
 function reviewChecks(rows){const dup=new Map(),names=new Map(),result=[];const add=(kind,message,entries)=>{if(result.length<30)result.push({kind,message,entries:entries.slice(0,5)})};
   for(const e of rows){if(e.type!=='purchase')continue;const n=norm(e.name);if(!n)continue;const k=JSON.stringify([n,e.date,e.amount]);if(!dup.has(k))dup.set(k,[]);dup.get(k).push(e);if(!names.has(n))names.set(n,[]);names.get(n).push(e)}
@@ -1783,7 +1808,7 @@ async function openErasePage(){if(eraseBusy||categoryBusy||view!=='prefs'||prefs
 function canErase(state=eraseState){return Boolean(state&&Number.isInteger(state.count)&&state.confirmed&&state.phrase==='ERASE ALL DATA'&&!eraseBusy&&!eraseBlocked())}
 function eraseHTML(){const s=eraseState;if(!s)return '';
   return `<section class="erase-warning"><strong>This cannot be undone.</strong><p>Erasing Pocket Ledger permanently removes the records and preferences saved in this browser or Home Screen app. It does not delete backups you have saved elsewhere.</p></section>
-  <section class="sec erase-section"><h3><span>What will be removed</span></h3><div class="line"><span>Expense and adjustment records</span><strong>${s.count===null?'Checking…':s.count}</strong></div><div class="line"><span>Custom categories &amp; learned names</span></div><div class="line"><span>Budget, appearance and AI settings</span></div><div class="line"><span>API key, insight history and legacy ledger data</span></div></section>
+  <section class="sec erase-section"><h3><span>What will be removed</span></h3><div class="line"><span>Expense and adjustment records</span><strong>${s.count===null?'Checking…':s.count}</strong></div><div class="line"><span>Custom categories, plans &amp; learned names</span></div><div class="line"><span>Budget, appearance and AI settings</span></div><div class="line"><span>API key, insight history and legacy ledger data</span></div></section>
   <section class="sec erase-section"><h3><span>Save a backup first</span></h3><p class="note">Download or copy a JSON backup and verify it before continuing. Backups do not include the API key.</p><div class="acts"><button type="button" class="link ink" data-act="download-backup" ${eraseBusy?'disabled':''}>Download JSON</button><button type="button" class="link ink" data-act="copy-backup" ${eraseBusy?'disabled':''}>Copy backup</button></div>${backupText?`<textarea class="in" id="p-backup" readonly aria-label="Backup text">${esc(backupText)}</textarea>`:''}</section>
   <section class="sec erase-section"><h3><span>Confirm permanent deletion</span></h3><label class="erase-check"><input type="checkbox" id="erase-ack" ${s.confirmed?'checked':''} ${eraseBusy?'disabled':''}><span>I have saved a backup, or accept that my data cannot be recovered.</span></label><label class="fld"><span>Type ERASE ALL DATA exactly to continue</span><input class="in" id="erase-phrase" value="${esc(s.phrase)}" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ERASE ALL DATA" ${eraseBusy?'disabled':''}></label>
   ${eraseBlocked()?'<p class="note">An operation is still running. Wait for it to finish, then return here if needed.</p>':''}${s.error?`<p class="err" role="alert">${esc(s.error)}</p>`:''}
@@ -1857,8 +1882,43 @@ async function saveCategoryOrder(){if(categoryBusy||!categoryOrderDraft)return;
   }catch(e){toast("Could not save order: "+e.message)}finally{categoryBusy=false;render()}
 }
 
+function overviewPlansHTML(stats){
+  const rows=S.plans.filter(p=>Object.hasOwn(stats.planTotals||{},p.id));
+  return `<section class="sec"><h3><span>Plans</span><button type="button" class="link ink" data-act="plans-open">${S.plans.length?'View plans':'Create a plan'}</button></h3>${rows.length?rows.map(p=>`<div class="line"><span>${esc(p.name)}<small>${p.separate?'Separate budget':'Within everyday target'}</small></span><strong>${money(stats.planTotals[p.id])}</strong></div>`).join(''):'<p class="note">Keep planned purchases together across financial months.</p>'}</section>`
+}
+function plansHTML(){
+  const totals=DATA.planSummary?.planTotals||{},counts=DATA.planSummary?.planCounts||{};
+  const rows=archived=>S.plans.filter(p=>p.archived===archived).map(p=>{const spent=totals[p.id]||0,left=p.target-spent;return `<div class="plan-card"><button type="button" class="plan-open" data-act="plan-edit" data-id="${esc(p.id)}"><span><strong>${esc(p.name)}</strong><small>${p.separate?'Separate budget':'Within everyday target'} · ${counts[p.id]||0} records</small></span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg></button><div class="plan-value">${money(spent)}${p.target?`<small> / ${money(p.target)}</small>`:''}</div>${p.target?`<div class="meter"><i style="width:${Math.max(0,Math.min(100,spent/p.target*100))}%"></i></div><p class="note">${left>=0?money(left)+' left in plan':money(-left)+' above plan target'}</p>`:''}${!p.archived?`<button type="button" class="link ink" data-act="plan-expense" data-id="${esc(p.id)}">+ Add expense</button>`:''}</div>`}).join('');
+  return `<section class="sec"><p class="note">Plans organise expenses by purpose, across financial months. A separate budget is only for money allocated outside your everyday target. Every expense stays in your total.</p><button type="button" class="btn" data-act="plan-new">Create plan</button><div class="plans-list">${rows(false)||'<p class="empty">No active plans yet.</p>'}</div>${S.plans.some(p=>p.archived)?'<h3 style="margin-top:24px"><span>Archived</span></h3><div class="plans-list">'+rows(true)+'</div>':''}</section>`
+}
+function planEditHTML(){
+  const d=planDraft;if(!d)return '';
+  const existing=planById(d.id);
+  return `<section class="sec"><label class="fld"><span>Name</span><input id="plan-name" class="in" value="${esc(d.name)}" maxlength="48" placeholder="e.g. UK trip 2027"></label><label class="fld"><span>Total target (optional)</span><input id="plan-target" class="in" inputmode="decimal" value="${esc(d.target)}" placeholder="No target"></label><div class="plan-scope"><strong>Budget treatment</strong>${existing?`<p class="note">${existing.separate?'Separate from everyday target':'Included in everyday target'}. Budget treatment is fixed to keep historical comparisons consistent. You can move individual expenses to another plan.</p>`:`<label class="erase-check"><input id="plan-separate" type="checkbox" ${d.separate?'checked':''}><span>Use a separate budget<br><small>I have allocated money outside my everyday target. Plan expenses still count towards total spending.</small></span></label>`}</div>${d.error?`<p class="err" role="alert">${esc(d.error)}</p>`:''}<div class="acts"><button type="button" class="link" data-act="prefs-back">Cancel</button><button type="button" class="btn push" data-act="plan-save" ${categoryBusy?'disabled':''}>Save plan</button></div>${existing?`<div class="acts" style="margin-top:20px"><button type="button" class="link" data-act="plan-archive">${existing.archived?'Reopen plan':'Archive plan'}</button></div><p class="note">Archiving hides a plan from new expenses without changing its records or budget treatment.</p>`:''}</section>`
+}
+function openPlanEdit(id=null){const p=planById(id);planDraft={id:p?.id||null,name:p?.name||'',target:p?.target?plain(p.target):'',separate:p?.separate||false,error:''};prefsPage='planEdit';render();window.scrollTo(0,0)}
+async function savePlan(archive=false){
+  const d=planDraft;if(!d||categoryBusy)return;const old=planById(d.id),name=d.name.trim(),target=d.target.trim()?parseMoney(d.target,false,true):0;
+  if(archive&&!old)return;
+  if(!archive&&(!name||name.length>48||target===null||S.plans.some(p=>p.id!==d.id&&norm(p.name)===norm(name)))){d.error='Enter a unique name and a valid target, or leave the target empty.';render();return}
+  if(!old&&S.plans.length>=100){d.error='Plan limit reached.';render();return}
+  if(eraseBlocked()){d.error='Finish active operations before saving.';render();return}
+  const next=archive?{...old,archived:!old.archived}:{id:old?.id||uid(),name,target,separate:old?old.separate:d.separate,archived:old?.archived||false};
+  const plans=old?S.plans.map(p=>p.id===old.id?next:p):[...S.plans,next];
+  if(!validPlans(plans)){d.error='Invalid plan.';render();return}
+  categoryBusy=true;render();const previous=S.plans;
+  try{await saveQueue.catch(()=>{});if(eraseBlocked())throw Error('Another operation is running.');S.plans=plans;try{await persist()}catch(e){S.plans=previous;throw e}planDraft=null;prefsPage='plans';await refreshView();toast(archive?(next.archived?'Plan archived.':'Plan reopened.'):'Plan saved.')}
+  catch(e){d.error='Could not save plan: '+e.message}finally{categoryBusy=false;render()}
+}
+
 const ACT={
   "prefs-page":el=>openPrefsPage(el.dataset.page),
+  "plans-open":()=>{prefsPage="plans";if(view==="prefs")refreshView();else location.hash="prefs"},
+  "plan-new":()=>openPlanEdit(),
+  "plan-edit":el=>openPlanEdit(el.dataset.id),
+  "plan-save":()=>savePlan(),
+  "plan-archive":()=>savePlan(true),
+  "plan-expense":el=>{if(planById(el.dataset.id)&&!planById(el.dataset.id).archived)openSheet(null,{planId:el.dataset.id})},
   "prefs-back":()=>prefsBack(),
   "prefs-erase":()=>openErasePage(),
   "erase-confirm":()=>eraseConfirmed(),
@@ -1922,6 +1982,8 @@ $("main").addEventListener("submit",e=>{e.preventDefault();if(e.target.id==="cap
 $("main").addEventListener("keydown",e=>{if(e.key!=="Enter"||e.target.id!=="cap-name")return;e.preventDefault();
   if(draft.amt.trim()||/\d$/.test(draft.name.trim()))saveCapture();else $("cap-amt")?.focus()});
 $("main").addEventListener("input",e=>{const t=e.target,d=t.dataset;
+  if(planDraft&&t.id==="plan-name"){planDraft.name=t.value;return}
+  if(planDraft&&t.id==="plan-target"){planDraft.target=t.value;return}
   if(t.id==="category-rename"&&categoryEdit){categoryEdit.name=t.value;return}
   if(t.id==="erase-phrase"&&eraseState){eraseState.phrase=t.value;updateEraseButton();return}
   if(t.hasAttribute("data-ledger-question")){askText=t.value;return}
@@ -1929,12 +1991,13 @@ $("main").addEventListener("input",e=>{const t=e.target,d=t.dataset;
   else if(d.mq){modelQuery=t.value;const results=document.querySelector(".models");if(results)results.innerHTML=modelOptionsHTML()}
   else if(d.set&&t.type!=="checkbox"){S.settings[d.set]=d.set==="currency"?safeCurrency(t.value):d.set==="model"||d.set==="key"?t.value.trim():t.value;testMsg="";persist()}});
 $("main").addEventListener("change",e=>{const t=e.target,d=t.dataset;
+  if(planDraft&&t.id==="plan-separate"){planDraft.separate=t.checked;return}
   if(t.id==="category-target"&&categoryEdit){categoryEdit.target=t.value;return}
   if(t.id==="erase-ack"&&eraseState){eraseState.confirmed=t.checked;updateEraseButton();return}
   if(d.insightLanguage&&Object.hasOwn(INSIGHT_LANGUAGES,t.value)){S.settings.insightLanguage=t.value;insightsError="";persist();render();return}
   if(d.draft==="date"){draft.date=t.value||today();render()}
   else if(d.cycle){const n=Number(t.value);if(validCycleStart(n)){S.settings.cycleStart=n;awaitPersistAndRefresh()}else render();toast(`Financial month now starts on day ${S.settings.cycleStart}.`)}
-  else if(d.num){const v=parseMoney(t.value);if(v!=null){S.settings[d.num]=v;persist()}render()}
+  else if(d.num){const v=parseMoney(t.value,false,d.num==='budget');if(v!=null){S.settings[d.num]=v;persist()}render()}
   else if(d.set&&t.type==="checkbox"){S.settings[d.set]=t.checked;persist();
     if(d.set==="ai"&&t.checked&&!(S.settings.key&&S.settings.model))toast("Add a key and a model to get suggestions.");render()}
   else if(d.set==="currency"){S.settings.currency=safeCurrency(t.value);persist();render()}
