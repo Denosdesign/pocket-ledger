@@ -1160,7 +1160,7 @@ function viewOverview(){const m=monthStats(),pct=m.budget?Math.max(0,Math.min(10
   const stats=DATA.overview||{categories:{},unknown:0,adjustments:0,count:0};
   const g=new Map(Object.entries(stats.categories));
   const order=categories(),rank=k=>k==="Other"?Infinity:order.includes(k)?order.indexOf(k):order.length;
-  const cats=[...g].filter(([k])=>k!=="Uncategorised").sort((a,b)=>rank(a[0])-rank(b[0])),flags=[];
+  const cats=[...g].filter(([k])=>k!=="Uncategorised").sort((a,b)=>(a[0]==="Other")-(b[0]==="Other")||b[1]-a[1]||rank(a[0])-rank(b[0])),flags=[];
   if(g.get("Uncategorised"))flags.push(["Uncategorised",g.get("Uncategorised")]);
   if(stats.unknown)flags.push(["Name unknown",stats.unknown]);
   if(stats.adjustments)flags.push(["Adjustments",stats.adjustments]);
@@ -1763,7 +1763,7 @@ function movedCategory(list,name,direction){const next=list.slice(),i=next.index
   if(name==="Other"||i<0||j<0||j>=next.length-1||Math.abs(direction)!==1)return next;
   [next[i],next[j]]=[next[j],next[i]];return next}
 function categoryOrderHTML(){const list=categoryOrderDraft||categories();
-  return `<section class="sec"><p class="note">Arrange categories in your preferred order. All category selectors and Overview use this order. Other stays last.</p>
+  return `<section class="sec"><p class="note">Arrange categories in your preferred order for category selectors. Overview ranks categories by spending. Other stays last.</p>
   <div class="settings-group category-list">${list.map((name,i)=>`<div class="settings-row order-row"><span class="settings-row-text"><strong>${esc(name)}</strong></span>${name==="Other"?'<small>Fixed</small>':`<button type="button" class="order-control" data-act="category-order-move" data-cat="${esc(name)}" data-direction="-1" aria-label="Move ${esc(name)} up" ${i===0||categoryBusy?'disabled':''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></button><button type="button" class="order-control" data-act="category-order-move" data-cat="${esc(name)}" data-direction="1" aria-label="Move ${esc(name)} down" ${i===list.length-2||categoryBusy?'disabled':''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>`}</div>`).join("")}</div>
   <div class="acts" style="margin-top:20px"><button type="button" class="link" data-act="prefs-back">Cancel</button><button type="button" class="btn push" data-act="category-order-save" ${categoryBusy||JSON.stringify(list)===JSON.stringify(categories())?'disabled':''}>${categoryBusy?'Saving…':'Save order'}</button></div></section>`
 }
