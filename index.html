@@ -713,6 +713,16 @@ function mergedPlans(local,incoming){const plans=local.map(p=>({...p})),mapping=
 function validAdjustments(list){
   return Array.isArray(list)&&list.length<=5000&&new Set(list.map(x=>x?.id)).size===list.length&&list.every(x=>x&&typeof x.id==='string'&&/^[a-zA-Z0-9_]{1,80}$/.test(x.id)&&validDate(x.from)&&validDate(x.to)&&x.from<=x.to&&daysBetween(x.from,x.to)<=7&&Number.isSafeInteger(x.daily)&&x.daily>0&&Number.isSafeInteger(x.daily*7)&&typeof x.stopped==='boolean');
 }
+function mergeSpendingAdjustments(local,incoming){
+  const list=local.map(x=>({...x}));let skipped=0;
+  for(const x of incoming){
+    if(list.some(p=>p.id===x.id))continue;
+    if(!x.stopped&&list.some(p=>!p.stopped&&p.from<=x.to&&x.from<=p.to)){skipped++;continue}
+    list.push({...x});
+  }
+  if(!validAdjustments(list))throw Error('Invalid or too many spending references.');
+  return {list,skipped};
+}
 function latestAdjustment(ref=today()){
   return (S.spendingAdjustments||[]).filter(x=>!x.stopped&&x.from<=ref).slice().sort((a,b)=>b.from.localeCompare(a.from)||b.id.localeCompare(a.id))[0]||null;
 }
@@ -1517,13 +1527,13 @@ async function importData(text,mode="merge"){
         if(union.length>=43)throw Error("Too many categories after merging. Merge similar categories first.");
         union.splice(union.length-1,0,cat);mapping.set(cat,cat)
       }
-      const pm=mergedPlans(S.plans,p.plans||[]);
+      const pm=mergedPlans(S.plans,p.plans||[]),am=mergeSpendingAdjustments(S.spendingAdjustments,p.spendingAdjustments||[]);
       const incoming=p.entries.filter(e=>!ids.has(e.id)).map(e=>{const row={...e};if(row.planId)row.planId=pm.mapping.get(row.planId);if(!row.category)return row;const to=mapping.get(row.category)??null;return to===row.category?row:reviseCategoryRecord(row,row.category,to)});
       const incomingDict=Object.fromEntries(Object.entries(p.dict||{}).filter(([k,v])=>typeof k==="string"&&mapping.get(v)).map(([k,v])=>[k,mapping.get(v)]));
-      newState=syncCustomCategories({...stateSnapshot(),plans:pm.plans,categoryList:union,octopusCategory:octopusCategory()||mapping.get(p.octopusCategory)||findOctopusCategory(union),dict:{...S.dict,...incomingDict},aiResults:{}});
+      newState=syncCustomCategories({...stateSnapshot(),plans:pm.plans,spendingAdjustments:am.list,categoryList:union,octopusCategory:octopusCategory()||mapping.get(p.octopusCategory)||findOctopusCategory(union),dict:{...S.dict,...incomingDict},aiResults:{}});
       await dbWrite(["entries","app"],tx=>{const store=tx.objectStore("entries");for(const e of incoming)store.add(recordFor(e));
         tx.objectStore("app").put({key:"current",value:structuredClone(newState)})});
-      normaliseState(newState);aiCache.clear();queryPlans.clear();await refreshView();toast(`Imported ${incoming.length} new entries. Skipped ${p.entries.length-incoming.length} duplicates.`)
+      normaliseState(newState);aiCache.clear();queryPlans.clear();await refreshView();toast(`Imported ${incoming.length} new entries. Skipped ${p.entries.length-incoming.length} duplicates.${am.skipped?' Kept local spending references over '+am.skipped+' overlapping imported references.':''}`)
     }else{
       await dbReplace(p.entries,newState,archive);normaliseState(newState);aiCache.clear();queryPlans.clear();await refreshView();toast(`Restored ${p.entries.length} entries.`)
     }
@@ -1981,7 +1991,7 @@ async function savePlan(archive=false){
 
 function adjustmentProgressHTML(a){
   const pct=Math.max(0,Math.min(100,a.spent/a.target*100)),date=shortDate(a.from)+' – '+shortDate(a.to);
-  return `<div class="adjustment-progress"><div class="adjustment-heading"><strong>${a.complete?'Adjustment review':'Spending adjustment'}</strong><span>${a.complete?esc(date):'Day '+a.elapsed+' of '+a.days}</span></div><div class="adjustment-value">${money(a.spent)} <small>/ ${money(a.target)}</small></div><div class="meter"><i style="width:${pct}%"></i></div><div class="adjustment-foot"><span>${a.left>=0?money(a.left)+(a.complete?' below reference':' left in reference'):money(-a.left)+' above reference'}</span><span>${a.complete?'Completed':a.daysLeft+' days left incl. today'}</span></div>${a.comparison?`<p class="note adjustment-comparison">${money(Math.abs(a.comparison.difference))} ${a.comparison.difference<0?'less':a.comparison.difference>0?'more':'difference'} recorded across ${a.comparison.days} completed days than the preceding equal period.</p>`:''}</div>`
+  return `<div class="adjustment-progress"><div class="adjustment-heading"><strong>${a.complete?'Adjustment review':'Spending adjustment'}</strong><span>${a.complete?esc(date):'Day '+a.elapsed+' of '+a.days}</span></div><div class="adjustment-value">${money(a.spent)} <small>/ ${money(a.target)}</small></div><div class="meter"><i style="width:${pct}%"></i></div><div class="adjustment-foot"><span>${a.left>=0?money(a.left)+(a.complete?' below reference':' left in reference'):money(-a.left)+' above reference'}</span><span>${a.complete?'Completed':a.daysLeft+' days left incl. today'}</span></div>${a.comparison?`<p class="note adjustment-comparison">${money(Math.abs(a.comparison.difference))} ${a.comparison.difference<0?'less':a.comparison.difference>0?'more':'change'} in recorded spending across ${a.comparison.days} completed days than the preceding equal period.</p>`:''}</div>`
 }
 function adjustmentHomeHTML(m){
   if(loading)return '';
@@ -1998,7 +2008,8 @@ function adjustmentPreview(d,m=monthStats()){
   const daily=parseMoney(d.daily),days=daysBetween(d.from,d.to);
   if(daily===null||!Number.isSafeInteger(daily*days))return '<p class="note">Enter an amount to see the period total.</p>';
   const target=daily*days,spent=d.id&&DATA.spendingAdjustment?.id===d.id?DATA.spendingAdjustment.spent:d.from===today()?budgetSpent(DATA.adjustmentToday||{}):0;
-  return `<div class="adjustment-heading"><span>Period reference</span><strong>${money(target)}</strong></div><div class="adjustment-heading"><span>Already recorded in period</span><strong>${money(spent)}</strong></div><div class="adjustment-heading"><span>${target>=spent?'Reference remaining':'Above this reference'}</span><strong>${money(Math.abs(target-spent))}</strong></div>`
+  const scenario=target>=spent&&d.from>=m.first&&d.to<=m.last?m.everyday-spent+target:null;
+  return `<div class="adjustment-heading"><span>Period reference</span><strong>${money(target)}</strong></div><div class="adjustment-heading"><span>Already recorded in period</span><strong>${money(spent)}</strong></div><div class="adjustment-heading"><span>${target>=spent?'Reference remaining':'Above this reference'}</span><strong>${money(Math.abs(target-spent))}</strong></div>${scenario!==null?`<p class="note" style="margin:10px 0 0">If the full reference is used, recorded everyday spending this month would reach ${money(scenario)} by ${esc(shortDate(d.to))}, before any later spending.</p>`:""}`
 }
 function adjustmentPageHTML(){
   if(loading)return '<p class="note">Loading your spending…</p>';
