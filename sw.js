@@ -1,4 +1,4 @@
-const CACHE = "pocket-ledger-v37";
+const CACHE = "pocket-ledger-v38";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 
 self.addEventListener("install", event => {

@@ -567,6 +567,11 @@ input:not([type=checkbox]):not([type=radio]),select,textarea{font-size:max(16px,
 @media(max-width:340px){.budget-target-head,.plan-split{font-size:12px}.budget-target-detail{font-size:11px}.receipt-stack{padding-left:13px;padding-right:13px}}
 
 .adjustment-panel{margin-top:17px;padding:13px 0 0;border-top:1px solid var(--line)}.adjustment-heading,.adjustment-foot{display:flex;justify-content:space-between;align-items:baseline;gap:10px}.adjustment-heading{font-size:14px}.adjustment-heading>strong{font-weight:500}.adjustment-heading>span:last-child,.adjustment-foot{font-size:12px;color:var(--muted)}.adjustment-panel>.note{margin:6px 0}.adjustment-panel>.link{margin-top:5px;font-size:13px;min-height:36px}.adjustment-value{font-size:24px;font-weight:500;letter-spacing:-.025em;margin-top:8px;font-variant-numeric:tabular-nums}.adjustment-value small{font-size:13px;color:var(--muted);font-weight:400}.adjustment-progress .meter{margin-top:8px}.adjustment-foot{margin-top:6px;flex-wrap:wrap}.adjustment-comparison{margin-top:9px}.adjustment-preview{border:1px solid var(--line);border-radius:12px;padding:12px;margin:14px 0}.adjustment-preview .adjustment-heading+.adjustment-heading{margin-top:10px}.adjustment-preview .adjustment-heading>strong{font-variant-numeric:tabular-nums}.adjustment-preview .adjustment-heading>span{font-size:13px;color:var(--muted)}#adj-daily{font-size:16px}
+
+/* One compact outlook entry, not a second budget dashboard. */
+.outlook-entry{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:12px 0 0;margin-top:12px;border:0;border-top:1px solid var(--line);background:none;text-align:left;color:var(--ink);min-height:44px;font-size:14px}
+.outlook-entry>span:first-child{min-width:0}.outlook-entry strong{display:block;font-weight:500}.outlook-entry small{display:block;color:var(--muted);font-size:12px;line-height:1.4;margin-top:3px}.outlook-entry-right{display:flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums;white-space:nowrap}.outlook-entry svg{flex:none;width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.5;color:var(--muted)}.outlook-link{color:var(--accent-ink);min-height:40px;padding:8px 0 0}.outlook-link small{display:inline;margin:0}
+.outlook-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:14px;line-height:1.45;padding:9px 0}.outlook-row span{min-width:0;color:var(--muted)}.outlook-row strong{font-weight:500;flex:none;font-variant-numeric:tabular-nums}.outlook-context{padding:2px 0 10px}.outlook-result{display:grid;gap:5px;margin-bottom:12px}.outlook-result>span,.outlook-result>small{font-size:13px;color:var(--muted)}.outlook-result>strong{font:400 clamp(32px,9vw,44px)/1.15 var(--display);letter-spacing:-.025em;font-variant-numeric:tabular-nums}.outlook-preview{margin:18px 0;padding:14px 0;border-block:1px solid var(--line)}.outlook-change{border-top:1px solid var(--line);margin-top:6px}.outlook-reference{border-top:1px solid var(--line);margin-top:12px;padding-top:14px;display:grid;gap:5px}.outlook-reference>span,.outlook-reference small{font-size:13px;color:var(--muted)}.outlook-reference strong{font-size:24px;font-weight:500}.outlook-legacy{margin:14px 0;padding:12px;border:1px solid var(--line);border-radius:12px}.outlook-intro>.btn{margin-top:14px}.outlook-intro>.link{display:block;margin-top:12px}.outlook-editor .acts{margin-top:18px}
 </style>
 </head>
 <body>
@@ -709,47 +714,65 @@ function planField(id,attrs){return S.plans.some(p=>!p.archived||p.id===id)?`<la
 function addPlanStats(out,e){if(!SPEND.has(e.type))return;const p=planById(e.planId);if(!p)return;out.planTotals[p.id]=(out.planTotals[p.id]||0)+e.amount;out.planCounts[p.id]=(out.planCounts[p.id]||0)+1;if(p.separate)out.separateSpent+=e.amount}
 function mergedPlans(local,incoming){const plans=local.map(p=>({...p})),mapping=new Map();for(const p of incoming){let existing=plans.find(x=>x.id===p.id);if(existing&&existing.separate!==p.separate){let i=1,id;do{id=p.id.slice(0,65)+"_import"+i++}while(plans.some(x=>x.id===id));existing={...p,id};plans.push(existing)}else if(!existing){existing={...p};plans.push(existing)}mapping.set(p.id,existing.id)}if(!validPlans(plans))throw Error("Too many or invalid plans in backup.");return {plans,mapping}}
 
-// A short-term spending reference never changes the monthly target or expense records.
+// Monthly outlook is a fixed recorded-outflow reference, not an additional budget.
 function validAdjustments(list){
-  return Array.isArray(list)&&list.length<=5000&&new Set(list.map(x=>x?.id)).size===list.length&&list.every(x=>x&&typeof x.id==='string'&&/^[a-zA-Z0-9_]{1,80}$/.test(x.id)&&validDate(x.from)&&validDate(x.to)&&x.from<=x.to&&daysBetween(x.from,x.to)<=7&&Number.isSafeInteger(x.daily)&&x.daily>0&&Number.isSafeInteger(x.daily*7)&&typeof x.stopped==='boolean');
+  return Array.isArray(list)&&list.length<=5000&&new Set(list.map(x=>x?.id)).size===list.length&&list.every(x=>{
+    if(!x||typeof x.id!=='string'||!/^[a-zA-Z0-9_]{1,80}$/.test(x.id)||!validDate(x.from)||!validDate(x.to)||x.from>x.to||typeof x.stopped!=='boolean')return false;
+    if(x.kind==='month')return validDate(x.cycleFrom)&&x.cycleFrom<=x.from&&daysBetween(x.cycleFrom,x.to)<=31&&[x.outlook,x.initialOutlook,x.originalTarget].every(n=>Number.isSafeInteger(n)&&n>=0)&&Number.isSafeInteger(x.revisions)&&x.revisions>=0;
+    return (x.kind==null||x.kind==='week')&&daysBetween(x.from,x.to)<=7&&Number.isSafeInteger(x.daily)&&x.daily>0&&Number.isSafeInteger(x.daily*7);
+  });
 }
 function mergeSpendingAdjustments(local,incoming){
   const list=local.map(x=>({...x}));let skipped=0;
-  for(const x of incoming){
-    if(list.some(p=>p.id===x.id))continue;
+  for(const x of incoming){if(list.some(p=>p.id===x.id))continue;
     if(!x.stopped&&list.some(p=>!p.stopped&&p.from<=x.to&&x.from<=p.to)){skipped++;continue}
     list.push({...x});
   }
-  if(!validAdjustments(list))throw Error('Invalid or too many spending references.');
-  return {list,skipped};
+  if(!validAdjustments(list))throw Error('Invalid or too many spending references.');return {list,skipped};
 }
-function latestAdjustment(ref=today()){
-  return (S.spendingAdjustments||[]).filter(x=>!x.stopped&&x.from<=ref).slice().sort((a,b)=>b.from.localeCompare(a.from)||b.id.localeCompare(a.id))[0]||null;
+function currentAdjustment(ref=today()){
+  const m=cycleBounds(ref),items=(S.spendingAdjustments||[]).filter(p=>p.from<=ref&&(p.kind==='month'?p.cycleFrom===m.first&&p.to===m.last:p.from>=m.first&&p.to<=m.last));
+  // A stopped monthly outlook must not reveal an older weekly reference.
+  const sorted=items.sort((a,b)=>Number(b.kind==='month')-Number(a.kind==='month')||b.from.localeCompare(a.from)||b.id.localeCompare(a.id));
+  const p=sorted[0];return p&&!p.stopped?p:null;
 }
-function adjustmentMetrics(p,ref,summary,comparison=null){
-  const days=daysBetween(p.from,p.to),elapsed=Math.max(0,Math.min(days,daysBetween(p.from,ref))),target=p.daily*days,spent=budgetSpent(summary);
-  return {id:p.id,from:p.from,to:p.to,daily:p.daily,days,elapsed,daysLeft:Math.max(0,days-elapsed+(ref<=p.to?1:0)),target,spent,left:target-spent,complete:ref>p.to,comparison};
+function previousMonthAdjustment(ref=today()){
+  const m=cycleBounds(ref),p=(S.spendingAdjustments||[]).filter(p=>p.kind==='month'&&p.to<m.first&&!p.stopped).sort((a,b)=>b.to.localeCompare(a.to)||b.id.localeCompare(a.id))[0];return p||null;
 }
-async function loadAdjustment(ref=today()){
-  const p=latestAdjustment(ref);if(!p)return null;
-  const end=p.to<ref?p.to:ref,completedEnd=p.to<ref?p.to:addDays(ref,-1),completedDays=completedEnd>=p.from?daysBetween(p.from,completedEnd):0;
-  const summary=await dbSummary(p.from,end);let comparison=null;
-  if(completedDays>=3){
-    const prevFrom=addDays(p.from,-completedDays),prevTo=addDays(p.from,-1);
-    const [now,prev]=await Promise.all([completedEnd===end?Promise.resolve(summary):dbSummary(p.from,completedEnd),dbSummary(prevFrom,prevTo)]);
-    if(Object.keys(now.everydayDays||{}).length>=Math.ceil(completedDays/2)&&Object.keys(prev.everydayDays||{}).length>=Math.ceil(completedDays/2)){
-      comparison={days:completedDays,current:budgetSpent(now),previous:budgetSpent(prev),difference:budgetSpent(now)-budgetSpent(prev)};
-    }
+function outlookMetrics(p,ref,summary,checkin=null){
+  const spent=budgetSpent(summary),daysLeft=Math.max(0,daysBetween(ref,p.to)),left=p.outlook-spent;
+  return {kind:'month',id:p.id,from:p.from,to:p.to,cycleFrom:p.cycleFrom,outlook:p.outlook,initialOutlook:p.initialOutlook,originalTarget:p.originalTarget,revisions:p.revisions,spent,left,daysLeft,dailyRemaining:daysLeft>0&&left>=0?Math.floor(left/daysLeft):null,complete:ref>p.to,checkin};
+}
+function outlookPreview(spent,daily,days){
+  if(!Number.isSafeInteger(spent)||!Number.isSafeInteger(daily)||daily<=0||!Number.isInteger(days)||days<1||days>31)return null;
+  const additional=daily*days,outlook=spent+additional,firstDays=Math.min(7,days);
+  if(!Number.isSafeInteger(additional)||!Number.isSafeInteger(outlook)||outlook<0)return null;
+  return {outlook,additional,firstDays,firstAmount:daily*firstDays,laterDays:days-firstDays,laterAmount:daily*(days-firstDays)};
+}
+async function loadAdjustment(ref=today(),includePrevious=false){
+  const p=currentAdjustment(ref)||(includePrevious?previousMonthAdjustment(ref):null);if(!p)return null;
+  const end=p.to<ref?p.to:ref;
+  if(p.kind!=='month'){
+    const summary=await dbSummary(p.from,end);return {kind:'week',id:p.id,from:p.from,to:p.to,daily:p.daily,target:p.daily*daysBetween(p.from,p.to),spent:budgetSpent(summary),complete:ref>p.to};
   }
-  return adjustmentMetrics(p,ref,summary,comparison);
+  const summary=await dbSummary(p.cycleFrom,end);let checkin=null;
+  // Compare complete calendar days only; the setup day can be partial.
+  const completedEnd=ref>p.to?p.to:addDays(ref,-1),start=addDays(p.from,1),n=completedEnd>=start?Math.min(7,daysBetween(start,completedEnd)):0;
+  if(n>0){
+    const from=addDays(completedEnd,1-n),priorFrom=addDays(from,-n),priorTo=addDays(from,-1);
+    const [now,prev]=await Promise.all([dbSummary(from,completedEnd),dbSummary(priorFrom,priorTo)]);
+    const covered=Object.keys(now.everydayDays||{}).length,previousCovered=Object.keys(prev.everydayDays||{}).length;
+    checkin={from,to:completedEnd,days:n,spent:budgetSpent(now),covered,previous:n>=3&&covered>=Math.ceil(n/2)&&previousCovered>=Math.ceil(n/2)?budgetSpent(prev):null};
+  }
+  return outlookMetrics(p,ref,summary,checkin);
 }
 function adjustmentVisible(m,ref=today()){
-  const a=DATA.spendingAdjustment,p=latestAdjustment(ref);
-  return a&&p&&a.id===p.id&&(!a.complete||a.to>=m.first)?a:null;
+  const a=DATA.spendingAdjustment,p=currentAdjustment(ref);return a&&p&&a.id===p.id?a:null;
 }
 function adjustmentPayload(a){
-  if(!a)return null;
-  return {from:a.from,to:a.to,status:a.complete?'completed':'in progress',calendar_days:a.days,elapsed_days_including_today:a.elapsed,remaining_days_including_today:a.daysLeft,daily_reference:money(a.daily),period_target:money(a.target),everyday_recorded:money(a.spent),difference_from_period_target:money(a.spent-a.target,{sign:true}),completed_days_comparison:a.comparison?{days:a.comparison.days,current_recorded:money(a.comparison.current),preceding_equal_period:money(a.comparison.previous),difference:money(a.comparison.difference,{sign:true})}:null,meaning:'An optional user-selected short-term reference, not an increase to the original monthly target or a daily limit. Includes the entire starting day, excludes separately budgeted plans. Comparisons use completed days only, and recorded amounts do not prove habits or affordability.'};
+  if(!a||a.kind!=='month'||a.complete)return null;
+  const check=a.checkin;
+  return {kind:'rest_of_month',from:a.from,financial_month_end:a.to,original_monthly_target_at_setup:money(a.originalTarget),initial_month_end_outlook:money(a.initialOutlook),current_month_end_outlook:money(a.outlook),recorded_everyday_month_to_date:money(a.spent),remaining_within_outlook:money(a.left),remaining_calendar_days_including_today:a.daysLeft,remaining_daily_reference:a.dailyRemaining===null?null:money(a.dailyRemaining),revision_count:a.revisions,completed_days_check_in:check?{from:check.from,to:check.to,days:check.days,recorded_amount:money(check.spent),average_recorded_per_calendar_day:money(Math.round(check.spent/check.days)),preceding_equal_period:check.previous===null?null:money(check.previous),difference:check.previous===null?null:money(check.spent-check.previous,{sign:true})}:null,meaning:'User-chosen fixed month-end everyday spending outlook, not a forecast, new funds, or change to the original target. Weekly check-ins never replenish the outlook. All everyday payments in the financial month count, including later corrections; separate plans are excluded. The daily reference is remaining outlook divided over remaining calendar days, not a daily cap. Recorded spending does not establish affordability or actual consumption.'};
 }
 
 function defaults(){return{spendingAdjustments:[],plans:[],dict:{},ai:{requests:0,cost:0,lastError:""},
@@ -978,7 +1001,7 @@ async function refreshView({preservePage=false}={}){
       records=result.receipt
     }else if(view==='prefs'&&['plans','planEdit'].includes(prefsPage)){result={planSummary:await dbSummary('0000-01-01',t,true)};records=[]}else{records=[]}
     if(view==='today'||view==='overview'||view==='prefs'&&prefsPage==='adjustment'){
-      result.spendingAdjustment=await loadAdjustment(t);
+      result.spendingAdjustment=await loadAdjustment(t,view==='prefs');
       if(view==='prefs'){result.month=await dbSummary(m.first,t);result.adjustmentRecent=await dbSummary(addDays(t,-7),addDays(t,-1));result.adjustmentToday=await dbSummary(t,t)}
       if(result.analytics)result.analytics.spendingAdjustment=result.spendingAdjustment;
     }
@@ -1187,8 +1210,8 @@ function recentLabels(){const m=new Map();
   for(const e of DATA.recent){if(e.type!=="purchase")continue;const k=norm(e.name);if(!k)continue;const r=m.get(k);if(r)r.n++;else m.set(k,{label:e.name,n:1})}
   return [...m.values()].sort((a,b)=>b.n-a.n).slice(0,5)}
 
-function budgetTargetHTML(m,detail=false){const used=m.budget?Math.max(0,Math.min(100,m.everyday/m.budget*100)):0;
-  return `<div class="budget-target"><div class="budget-target-head"><span>Everyday spending</span><strong>${money(m.everyday)}</strong></div>${m.budget?`<div class="meter" role="img" aria-label="${esc(money(m.everyday)+' of '+money(m.budget)+' target')}"><i style="width:${used}%"></i></div><div class="budget-target-detail"><span>${m.left>=0?money(m.left)+' left':money(-m.left)+' above target'}</span><span>${money(m.budget)} target</span></div>${detail&&m.left>0?`<p class="budget-daily">About ${money(Math.floor(m.left/m.daysLeft))} a day</p>`:''}`:'<p class="budget-daily">No target set</p>'}${m.separate!==0?`<div class="plan-split"><span>Planned spending</span><strong>${money(m.separate)}</strong></div>`:''}</div>`
+function budgetTargetHTML(m,detail=false,showOutlook=false){const used=m.budget?Math.max(0,Math.min(100,m.everyday/m.budget*100)):0,active=showOutlook?adjustmentVisible(m):null;
+  return `<div class="budget-target"><div class="budget-target-head"><span>Everyday spending</span><strong>${money(m.everyday)}</strong></div>${m.budget?`${active?.kind==='month'?'':`<div class="meter" role="img" aria-label="${esc(money(m.everyday)+' of '+money(m.budget)+' target')}"><i style="width:${used}%"></i></div>`}<div class="budget-target-detail"><span>${m.left>=0?money(m.left)+' left':money(-m.left)+' above target'}</span><span>${money(m.budget)} target</span></div>${detail&&m.left>0&&active?.kind!=='month'?`<p class="budget-daily">About ${money(Math.floor(m.left/m.daysLeft))} a day</p>`:''}`:'<p class="budget-daily">No target set</p>'}${m.separate!==0?`<div class="plan-split"><span>Planned spending</span><strong>${money(m.separate)}</strong></div>`:''}${showOutlook?adjustmentHomeHTML(m):''}</div>`
 }
 
 function viewToday(){const t=today(),tot=DATA.todaySpent,m=monthStats(),todays=DATA.todayEntries,rec=recentLabels();
@@ -1201,7 +1224,7 @@ function viewToday(){const t=today(),tot=DATA.todaySpent,m=monthStats(),todays=D
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h15l-3-3m3 3-3 3M20 17H5l3-3m-3 3 3 3"/></svg>
       </button></div>
     <div class="metric-value" aria-live="polite">${fig(cumulative?m.spent:tot)}</div>
-    <p class="sub cycle-range">${cumulative?esc(m.name):esc(shortDate(t))+" · Today’s total"}</p>${budgetTargetHTML(m)}${adjustmentHomeHTML(m)}
+    <p class="sub cycle-range">${cumulative?esc(m.name):esc(shortDate(t))+" · Today’s total"}</p>${budgetTargetHTML(m,false,true)}
   </section>
   <section class="history today-history" aria-label="Today’s entries">
     <div class="section-head"><h3>Today’s entries</h3><span>${todays.length} ${todays.length===1?"entry":"entries"}</span></div>
@@ -1263,7 +1286,7 @@ function viewOverview(){const m=monthStats();
   return `${masthead()}
   <h2 class="overview-heading">${m.calendarName}</h2><p class="sub cycle-range">${esc(m.name)}</p>
   ${fig(m.spent)}
-  <p class="sub">Total recorded spending</p>${budgetTargetHTML(m,true)}${adjustmentHomeHTML(m)}
+  <p class="sub">Total recorded spending</p>${budgetTargetHTML(m,true,true)}
   <p class="note">${stats.count} recorded ${stats.count===1?"expense":"expenses"} this financial month.</p>
   ${overviewPlansHTML(stats)}<section class="sec"><h3><span>By category</span></h3><p class="note">Includes all recorded spending, including plans.</p>
     ${cats.length||flags.length?cats.map(c=>cat(c,false)).join("")+flags.map(f=>cat(f,true)).join("")
@@ -1272,7 +1295,7 @@ function viewOverview(){const m=monthStats();
 
 function modelOptionsHTML(){const q=norm(modelQuery),list=models?models.filter(m=>!q||norm(m.id+" "+m.name).includes(q)).slice(0,8):[];
   return list.map(m=>`<button type="button" data-act="pick-model" data-id="${esc(m.id)}" aria-pressed="${m.id===S.settings.model}"><span>${esc(m.id)}</span><span>${m.p||m.c?`$${(m.p*1e6).toFixed(2)} / $${(m.c*1e6).toFixed(2)} per 1M`:"free"}</span></button>`).join("")||`<p class="empty">No match.</p>`}
-const PREF_PAGES={appearance:'Appearance',budget:'Budget & financial month',categories:'Categories',intelligence:'AI & insights',learned:'Learned names',data:'Data & backup',erase:'Erase all data',categoryEdit:'Edit category',categoryOrder:'Category order',plans:'Plans',planEdit:'Edit plan',adjustment:'Spending adjustment'};
+const PREF_PAGES={appearance:'Appearance',budget:'Budget & financial month',categories:'Categories',intelligence:'AI & insights',learned:'Learned names',data:'Data & backup',erase:'Erase all data',categoryEdit:'Edit category',categoryOrder:'Category order',plans:'Plans',planEdit:'Edit plan',adjustment:'Rest of month'};
 let prefsPage='',eraseState=null,eraseBusy=false,importBusy=false,testBusy=false,categoryEdit=null,categoryBusy=false,categoryOrderDraft=null,planDraft=null,adjustmentDraft=null;
 function settingsRow(id,title,detail,ico){return `<button type="button" class="settings-row" data-act="prefs-page" data-page="${id}"><span class="settings-icon">${ico}</span><span class="settings-row-text"><strong>${esc(title)}</strong><small>${esc(detail)}</small></span><svg class="settings-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg></button>`}
 function prefsIcon(path){return `<svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg>`}
@@ -1314,7 +1337,7 @@ function viewPrefs(){const s=S.settings;
       ${Array.from({length:31},(_,i)=>i+1).map(day=>`<option value="${day}" ${s.cycleStart===day?"selected":""}>${day}${day===31?" · end of month":""}</option>`).join("")}
     </select></label>
     <div class="cycle-preview" aria-live="polite"><span>Current financial month</span><strong>${esc(monthStats().name)}</strong></div>
-    <p class="note">For months with fewer days, the period starts on the last available day. For example, choosing 31 means the final day of every month.</p><button type="button" class="link ink" data-act="adjustment-open">Spending adjustment →</button>
+    <p class="note">For months with fewer days, the period starts on the last available day. For example, choosing 31 means the final day of every month.</p><button type="button" class="link ink" data-act="adjustment-open">Rest of month →</button>
   </section>`;
   else if(prefsPage==='adjustment')content=adjustmentPageHTML();
   else if(prefsPage==='plans')content=plansHTML();
@@ -1833,10 +1856,10 @@ function insightPayload(a){
   });
   const pacing=budget>0?{everyday_budget_target:money(budget),everyday_recorded_spending:money(everyday),budget_remaining:money(remaining),budget_used_percentage:pct(everyday,budget),
     elapsed_calendar_day_percentage:pct(elapsed,totalDays),difference_from_even_calendar_budget_pace:money(everyday-Math.round(budget*elapsed/totalDays),{sign:true}),
-    remaining_daily_allowance_including_today:money(allowance),next_seven_days_allowance_including_today:daysLeft>=7&&remaining>=0?money(allowance*7):null,
+    remaining_daily_allowance_including_today:remaining>=0?money(allowance):null,next_seven_days_allowance_including_today:daysLeft>=7&&remaining>=0?money(allowance*7):null,
     already_over_budget:remaining<0}:null;
   const recentEveryday=h?h.recent.spending-(h.recent.separateSpent||0):0;
-  const scenario=budget>0&&daysLeft>=7&&h?.recent.everydayRecordedDays>=Math.ceil(h.recent.days/2)&&recentEveryday>=0?
+  const scenario=!a.spendingAdjustment&&budget>0&&remaining>=0&&daysLeft>=7&&h?.recent.everydayRecordedDays>=Math.ceil(h.recent.days/2)&&recentEveryday>=0?
     {condition:'If the next seven days of additional everyday recorded spending equal everyday recorded spending in the last seven completed days.',
       additional_spending:money(recentEveryday),remaining_budget_afterwards:money(remaining-recentEveryday),
       remaining_calendar_days_after_scenario:daysLeft-7,
@@ -1846,19 +1869,19 @@ function insightPayload(a){
     evidence:a.forecast.method.startsWith('Based on the previous eight weeks')?'historical_weekday_estimate':a.forecast.method.startsWith('Based on recorded spending')?'simple_current_pace_extrapolation':'end_of_period_recorded_total'}:null;
   return {currency:S.settings.currency,current_financial_month:{from:a.from,as_of:a.to,end:m.last,elapsed_calendar_days_including_today:elapsed,
     remaining_calendar_days_including_today:daysLeft,total_calendar_days:totalDays,recorded_spending:money(a.current.spent),recording_context:current?windowSummary(current):null},
-    budget_position:pacing,spending_adjustment:adjustmentPayload(a.spendingAdjustment&&(!a.spendingAdjustment.complete||a.spendingAdjustment.to>=a.from)?a.spendingAdjustment:null),plans_context:{total_recorded:money(a.current.spent),everyday_recorded:money(everyday),separate_planned_recorded:money(a.current.separateSpent||0),active_plan_count:S.plans.filter(p=>!p.archived).length,meaning:'Separate plan amounts are already included in total and categories, but excluded from the everyday target. Plan membership is user assigned. No proof of available funds or future payment timing. Names of plans are not shared.'},short_term:{recent:h?windowSummary(h.recent):null,comparison:shortTerm},
+    budget_position:pacing,spending_adjustment:adjustmentPayload(a.spendingAdjustment),plans_context:{total_recorded:money(a.current.spent),everyday_recorded:money(everyday),separate_planned_recorded:money(a.current.separateSpent||0),active_plan_count:S.plans.filter(p=>!p.archived).length,meaning:'Separate plan amounts are already included in total and categories, but excluded from the everyday target. Plan membership is user assigned. No proof of available funds or future payment timing. Names of plans are not shared.'},short_term:{recent:h?windowSummary(h.recent):null,comparison:shortTerm},
     medium_term_same_elapsed_financial_month_comparison:mediumTerm,
     longer_term:{completed_financial_months_most_recent_first:longTerm.map(windowSummary),months_used_for_category_history:reliableMonths.length>=2?reliableMonths.length:0},
     category_context:categoryContext,octopus_context:{category:octopusCategory(),current_recorded_amount_already_in_total:money(current?.walletAmount||0),explicit_topups_subset:money(current?.explicitTopups||0),user_usage_context:'Transport-oriented everyday spending, also covering other small purchases. This is the user’s qualitative description, not a measured split. Octopus remains a separate category; consider its relationship with routine transport needs without assuming all payments are fares.',interpretation:OCTOPUS_GUIDE+' Wallet amounts are already included in total spending and any associated category. Never add them again. Actual wallet balance, item-level purchases, dates of use and remaining funded days are unknown.'},overall_spending_concentration:concentration,conditional_seven_day_budget_scenario:scenario,forecast,
     budget_scope:'The financial-month target covers everyday expenses including plans not marked separate. Separate plans are explicitly user allocated, not evidence of affordability. No category budgets, income, cash balances, debt obligations or future essential costs are supplied. An exceeded spending budget is not evidence of insolvency or inability to pay for necessities.',
     data_semantics:'Ledger records are manually logged amounts and can combine multiple purchases, top-ups, bills or future consumption. A record is not a meal, ride, item or day of use. Category totals and changes describe recorded amounts, not consumption, necessity or behavioural causes. Calendar day coverage is a rough comparison screen, not proof of completeness. Today is incomplete; zero recorded spending is not proof of no spending. Current budget is not historical budget. Category share uses purchase amounts only, excluding unknown-name records and adjustments. Historical category values align with the usable completed months, newest first. Missing comparisons mean insufficient evidence.'};
 }
-const insightKey=a=>JSON.stringify(['insights-adjustment-v14',S.settings.insightLanguage,S.settings.model,insightPayload(a)]);
+const insightKey=a=>JSON.stringify(['insights-outlook-v15',S.settings.insightLanguage,S.settings.model,insightPayload(a)]);
 function insightsHTML(){const a=DATA.analytics;if(!a)return '';const p=a.previous,c=a.current,diff=c.spent-p.spent,percent=a.comparable&&p.spent>0?Math.round(diff/p.spent*100):null;
   const cache=S.insightCache,hit=cache&&cache.key===insightKey(a)&&typeof cache.text==='string';const top=Object.entries(c.categories).sort((x,y)=>y[1]-x[1])[0];
-  return `<section class="sec"><h3><span>Everyday spending forecast</span><span>Estimate</span></h3>${a.forecast?`<strong class="smart-number">${money(a.forecast.amount)}</strong><p class="note">${esc(a.forecast.method)} ${S.settings.budget?(a.forecast.amount>S.settings.budget?'Above the everyday target.':'Within the everyday target.'):'No everyday target set.'} Excludes separate plans. Estimates recorded payments, not actual consumption. Octopus funding dates may differ from use dates; excludes unknown future bills.</p>`:'<p class="note">Not enough recorded spending yet for a useful estimate.</p>'}</section><section class="sec"><h3><span>${aiMark} Spending insights</span><button type="button" class="link ink" data-act="insight-run" ${insightsBusy||!c.count?'disabled':''}>${insightsBusy?'Generating…':hit?'Regenerate':'Generate insights'}</button></h3>${a.comparable?`<div class="line"><span>Same elapsed period last month<small>${esc(a.previousFrom)} to ${esc(a.previousTo)}</small></span><strong>${money(p.spent)}</strong></div><div class="line"><span>Recorded this month<small>${esc(a.from)} to ${esc(a.to)}</small></span><strong>${money(c.spent)}</strong></div><p class="note">${money(diff,{sign:true})}${percent!==null?' · '+Math.abs(percent)+'% '+(percent>0?'higher':percent<0?'lower':'change'):''}</p>`:'<p class="note">No comparable prior period with entries yet.</p>'}${top?`<p class="note">Largest category so far: ${esc(top[0])} · ${money(top[1])}.</p>`:''}<p class="note">AI receives only these aggregated figures, not receipt names or individual transactions.</p>${hit?`<div class="smart-result"><p class="smart-report">${esc(cache.text)}</p><p class="note">Saved insight · ${esc(cache.date||'')}</p></div>`:''}${insightsError?`<p class="err" role="status">${esc(insightsError)}</p>`:''}</section>`
+  return `<section class="sec"><h3><span>Everyday spending forecast</span><span>Estimate</span></h3>${a.forecast?`<strong class="smart-number">${money(a.forecast.amount)}</strong><p class="note">${esc(a.forecast.method)} ${a.spendingAdjustment?.kind==='month'?'This estimate is separate from your chosen outlook.':S.settings.budget?(a.forecast.amount>S.settings.budget?'Above the everyday target.':'Within the everyday target.'):'No everyday target set.'} Excludes separate plans. Estimates recorded payments, not actual consumption. Octopus funding dates may differ from use dates; excludes unknown future bills.</p>`:'<p class="note">Not enough recorded spending yet for a useful estimate.</p>'}</section><section class="sec"><h3><span>${aiMark} Spending insights</span><button type="button" class="link ink" data-act="insight-run" ${insightsBusy||!c.count?'disabled':''}>${insightsBusy?'Generating…':hit?'Regenerate':'Generate insights'}</button></h3>${a.comparable?`<div class="line"><span>Same elapsed period last month<small>${esc(a.previousFrom)} to ${esc(a.previousTo)}</small></span><strong>${money(p.spent)}</strong></div><div class="line"><span>Recorded this month<small>${esc(a.from)} to ${esc(a.to)}</small></span><strong>${money(c.spent)}</strong></div><p class="note">${money(diff,{sign:true})}${percent!==null?' · '+Math.abs(percent)+'% '+(percent>0?'higher':percent<0?'lower':'change'):''}</p>`:'<p class="note">No comparable prior period with entries yet.</p>'}${top?`<p class="note">Largest category so far: ${esc(top[0])} · ${money(top[1])}.</p>`:''}<p class="note">AI receives only these aggregated figures, not receipt names or individual transactions.</p>${hit?`<div class="smart-result"><p class="smart-report">${esc(cache.text)}</p><p class="note">Saved insight · ${esc(cache.date||'')}</p></div>`:''}${insightsError?`<p class="err" role="status">${esc(insightsError)}</p>`:''}</section>`
 }
-async function generateInsights(){const a=DATA.analytics;if(!a||insightsBusy||!a.current.count)return;const key=insightKey(a);insightsBusy=true;insightsError='';render();try{const j=await smartRemote('You are a perceptive personal spending analyst. '+INSIGHT_LANGUAGES[S.settings.insightLanguage].guide+' Write two or three natural short paragraphs. The purpose is to help the reader understand their spending, not to manage or police it. Find one or two non-obvious observations by connecting the supplied figures across time periods, categories, overall concentration or budget context. Explain their significance. Prefer a genuinely useful contrast over repeating dashboard totals. Octopus remains a separate ledger category but the user describes their Octopus spending as transport-oriented, with some other small everyday purchases. Interpret it primarily in the context of routine mobility and everyday needs rather than as a general-purpose shopping wallet. Read octopus_context and wallet subsets before interpreting category or daily changes. Consider Octopus alongside Transport when discussing mobility-related budget pressure, without adding the full Octopus amount to transport totals or assuming an exact transport share. Do not dismiss the budget significance of top-ups merely because actual usage occurs later; the money has already been allocated. Mention the payment-versus-usage distinction only when it materially improves the observation, not as a recurring disclaimer. Treat top-up dates as recorded funding dates, never actual dates of consumption; the amount is already included in the budget. Distinguish recorded cash outflow from actual use, and never infer daily wallet consumption, available wallet balance or a transport share. Historical Octopus records may have been assigned to other categories; their separately supplied subsets must not be interpreted as that category usage. The non-Octopus subtotal is descriptive, not a new budget balance or a measure of actual consumption. Avoid treating top-up dates as consumption trends. A large payment can explain the shape of recorded spending without proving a bad habit; a record is not a meal, trip or item. Do not infer frequency of consumption, recurrence, necessity or payment purpose. Distinguish observed changes from hypotheses; avoid speculative explanations that add no information. Consider stable or improved recorded patterns as well as pressure, with understated recognition when earned. Use plans_context to separate everyday target performance from all recorded outflow. A separate plan payment is not everyday overspending; never imply it is affordable or ignore it in total spending. Budget targets are flexible references, not pass/fail scores. When spending_adjustment is present, consider progress during that chosen period separately from the original monthly target. Recognise a concrete reduction only when the supplied completed-days comparison supports it; do not claim improved habits. An exceeded short-term reference is not another failure. Do not prescribe new limits, repeat the monthly overshoot or advise catching up to an impossible budget. Use the adjustment context only where useful. Forecast and stress-test figures refer to everyday outflow only. Never invent category budgets, spending bans, planned purchases or rules about what the reader should buy. The remaining daily allowance describes the budget, not the readers ability to afford life. Forecasts and stress tests are optional context, not predicted outcomes or threats. Never equate overshooting a budget with running out of money or being unable to pay for essentials. There is no mandatory recommendation, checklist, question or closing action. Offer a brief, proportionate option only if it follows from an actual finding and adds value; otherwise end with the insight itself. Do not tell the reader to check whether each category is finished for the month, earmark imagined bills or repeatedly restate allowance. When evidence is limited, make the best supported descriptive observation instead of generic advice. Use only supplied numerical figures, exactly as formatted; no new calculations. No headings, JSON, tables, preambles, forced praise or alarmist wording.',insightPayload(a),'text');S.insightCache={key,text:j,date:today()};await persist()}catch(e){insightsError=e.message}finally{insightsBusy=false;render()}}
+async function generateInsights(){const a=DATA.analytics;if(!a||insightsBusy||!a.current.count)return;const key=insightKey(a);insightsBusy=true;insightsError='';render();try{const j=await smartRemote('You are a perceptive personal spending analyst. '+INSIGHT_LANGUAGES[S.settings.insightLanguage].guide+' Write two or three natural short paragraphs. The purpose is to help the reader understand their spending, not to manage or police it. Find one or two non-obvious observations by connecting the supplied figures across time periods, categories, overall concentration or budget context. Explain their significance. Prefer a genuinely useful contrast over repeating dashboard totals. Octopus remains a separate ledger category but the user describes their Octopus spending as transport-oriented, with some other small everyday purchases. Interpret it primarily in the context of routine mobility and everyday needs rather than as a general-purpose shopping wallet. Read octopus_context and wallet subsets before interpreting category or daily changes. Consider Octopus alongside Transport when discussing mobility-related budget pressure, without adding the full Octopus amount to transport totals or assuming an exact transport share. Do not dismiss the budget significance of top-ups merely because actual usage occurs later; the money has already been allocated. Mention the payment-versus-usage distinction only when it materially improves the observation, not as a recurring disclaimer. Treat top-up dates as recorded funding dates, never actual dates of consumption; the amount is already included in the budget. Distinguish recorded cash outflow from actual use, and never infer daily wallet consumption, available wallet balance or a transport share. Historical Octopus records may have been assigned to other categories; their separately supplied subsets must not be interpreted as that category usage. The non-Octopus subtotal is descriptive, not a new budget balance or a measure of actual consumption. Avoid treating top-up dates as consumption trends. A large payment can explain the shape of recorded spending without proving a bad habit; a record is not a meal, trip or item. Do not infer frequency of consumption, recurrence, necessity or payment purpose. Distinguish observed changes from hypotheses; avoid speculative explanations that add no information. Consider stable or improved recorded patterns as well as pressure, with understated recognition when earned. Use plans_context to separate everyday target performance from all recorded outflow. A separate plan payment is not everyday overspending; never imply it is affordable or ignore it in total spending. Budget targets are flexible references, not pass/fail scores. When spending_adjustment is present, distinguish the original monthly target, user-chosen fixed month-end outlook, recorded spending and conditional statistical forecast. Weekly check-ins never add new money. Recognise a concrete reduction only when the supplied completed-days comparison supports it; do not claim improved habits. Do not prescribe new limits, repeat the monthly overshoot or advise catching up to an impossible budget. Use the outlook and the remaining daily reference when they add useful context, never as evidence of available cash. Forecast and stress-test figures refer to everyday outflow only. Never invent category budgets, spending bans, planned purchases or rules about what the reader should buy. The remaining daily allowance describes the budget, not the readers ability to afford life. Forecasts and stress tests are optional context, not predicted outcomes or threats. Never equate overshooting a budget with running out of money or being unable to pay for essentials. There is no mandatory recommendation, checklist, question or closing action. Offer a brief, proportionate option only if it follows from an actual finding and adds value; otherwise end with the insight itself. Do not tell the reader to check whether each category is finished for the month, earmark imagined bills or repeatedly restate allowance. When evidence is limited, make the best supported descriptive observation instead of generic advice. Use only supplied numerical figures, exactly as formatted; no new calculations. No headings, JSON, tables, preambles, forced praise or alarmist wording.',insightPayload(a),'text');S.insightCache={key,text:j,date:today()};await persist()}catch(e){insightsError=e.message}finally{insightsBusy=false;render()}}
 /* Smart Review: bounded local checks, no automated edits or API requests. */
 function reviewChecks(rows){const dup=new Map(),names=new Map(),result=[];const add=(kind,message,entries)=>{if(result.length<30)result.push({kind,message,entries:entries.slice(0,5)})};
   for(const e of rows){if(e.type!=='purchase')continue;const n=norm(e.name);if(!n)continue;const k=JSON.stringify([n,e.date,e.amount]);if(!dup.has(k))dup.set(k,[]);dup.get(k).push(e);if(!names.has(n))names.set(n,[]);names.get(n).push(e)}
@@ -1989,58 +2012,68 @@ async function savePlan(archive=false){
   catch(e){d.error='Could not save plan: '+e.message}finally{categoryBusy=false;render()}
 }
 
-function adjustmentProgressHTML(a){
-  const pct=Math.max(0,Math.min(100,a.spent/a.target*100)),date=shortDate(a.from)+' – '+shortDate(a.to);
-  return `<div class="adjustment-progress"><div class="adjustment-heading"><strong>${a.complete?'Adjustment review':'Spending adjustment'}</strong><span>${a.complete?esc(date):'Day '+a.elapsed+' of '+a.days}</span></div><div class="adjustment-value">${money(a.spent)} <small>/ ${money(a.target)}</small></div><div class="meter"><i style="width:${pct}%"></i></div><div class="adjustment-foot"><span>${a.left>=0?money(a.left)+(a.complete?' below reference':' left in reference'):money(-a.left)+' above reference'}</span><span>${a.complete?'Completed':a.daysLeft+' days left incl. today'}</span></div>${a.comparison?`<p class="note adjustment-comparison">${money(Math.abs(a.comparison.difference))} ${a.comparison.difference<0?'less':a.comparison.difference>0?'more':'change'} in recorded spending across ${a.comparison.days} completed days than the preceding equal period.</p>`:''}</div>`
-}
+function outlookRow(label,value,cls=''){return `<div class="outlook-row ${cls}"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`}
 function adjustmentHomeHTML(m){
   if(loading)return '';
   const a=adjustmentVisible(m);
-  if(a)return `<section class="adjustment-panel">${adjustmentProgressHTML(a)}<button type="button" class="link ink" data-act="adjustment-open">${a.complete?'Review &amp; plan ahead':'View adjustment'} →</button></section>`;
-  if(!m.budget||m.left>=0)return '';
-  return `<section class="adjustment-panel"><div class="adjustment-heading"><strong>Looking ahead</strong><span>${m.daysLeft} ${m.daysLeft===1?'day':'days'} left</span></div><p class="note">The monthly target stays unchanged. Set a fresh reference for the days ahead, if useful.</p><button type="button" class="link ink" data-act="adjustment-open">Adjust spending →</button></section>`
-}
-function adjustmentEditor(d){
-  const m=monthStats(),days=daysBetween(d.from,d.to);
-  return `<section class="sec"><h3><span>${d.id?'Edit reference':'Set a spending reference'}</span></h3><p class="note">${esc(shortDate(d.from)+' – '+shortDate(d.to))} · ${days} calendar ${days===1?'day':'days'}. Includes the full starting day, even amounts already recorded. Separate plans are excluded.</p><label class="fld"><span>Daily reference (${esc(cur())})</span><input class="in" id="adj-daily" inputmode="decimal" value="${esc(d.daily)}" placeholder="Choose an amount"></label>${Object.keys(DATA.adjustmentRecent?.everydayDays||{}).length>=4?`<p class="note">Recent reference: ${money(Math.round(budgetSpent(DATA.adjustmentRecent)/7))} a day across the last seven completed days. Recorded payments only, not a suggested limit.</p>`:''}<div class="adjustment-preview" id="adj-preview" aria-live="polite">${adjustmentPreview(d,m)}</div><p class="note">This is a shared reference for the whole period, not a daily cap. Keep enough room for everyday needs. Your original monthly target is not changed.</p>${d.error?`<p class="err" role="alert">${esc(d.error)}</p>`:''}<div class="acts"><button type="button" class="link" data-act="adj-cancel">Cancel</button><button type="button" class="btn push" data-act="adj-save" ${categoryBusy?'disabled':''}>Save reference</button></div></section>`
+  if(a?.kind==='month')return `<button type="button" class="outlook-entry" data-act="adjustment-open"><span><strong>Rest of month</strong><small>${a.left>0?money(a.dailyRemaining)+' a day · '+a.daysLeft+' days left':a.left===0?'At planned outlook · '+a.daysLeft+' days left':money(-a.left)+' above outlook · '+a.daysLeft+' days left'}</small></span><span class="outlook-entry-right">${money(a.outlook)}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg></span></button>`;
+  if(!m.budget&&!a)return '';
+  return `<button type="button" class="outlook-entry outlook-link" data-act="adjustment-open"><span>${a?'Review spending reference':'Plan ahead'}${m.left<0?' <small>· '+m.daysLeft+' days left</small>':''}</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg></button>`;
 }
 function adjustmentPreview(d,m=monthStats()){
-  const daily=parseMoney(d.daily),days=daysBetween(d.from,d.to);
-  if(daily===null||!Number.isSafeInteger(daily*days))return '<p class="note">Enter an amount to see the period total.</p>';
-  const target=daily*days,spent=d.id&&DATA.spendingAdjustment?.id===d.id?DATA.spendingAdjustment.spent:d.from===today()?budgetSpent(DATA.adjustmentToday||{}):0;
-  const scenario=target>=spent&&d.from>=m.first&&d.to<=m.last?m.everyday-spent+target:null;
-  return `<div class="adjustment-heading"><span>Period reference</span><strong>${money(target)}</strong></div><div class="adjustment-heading"><span>Already recorded in period</span><strong>${money(spent)}</strong></div><div class="adjustment-heading"><span>${target>=spent?'Reference remaining':'Above this reference'}</span><strong>${money(Math.abs(target-spent))}</strong></div>${scenario!==null?`<p class="note" style="margin:10px 0 0">If the full reference is used, recorded everyday spending this month would reach ${money(scenario)} by ${esc(shortDate(d.to))}, before any later spending.</p>`:""}`
+  const daily=parseMoney(d.daily),v=outlookPreview(m.everyday,daily,m.daysLeft);
+  if(!v)return '<p class="note">Enter a positive daily amount to see your month-end outlook.</p>';
+  const change=d.priorOutlook==null?null:v.outlook-d.priorOutlook;
+  return `<div class="outlook-result"><span>Month-end outlook</span><strong>${money(v.outlook)}</strong><small>${m.budget?money(Math.abs(v.outlook-m.budget))+(v.outlook>m.budget?' above monthly target':v.outlook<m.budget?' below monthly target':' difference from target'):'No monthly target set'}</small></div>${outlookRow('Additional spending',money(v.additional))}${outlookRow('Next '+v.firstDays+' '+(v.firstDays===1?'day':'days'),money(v.firstAmount))}${v.laterDays?outlookRow('Following '+v.laterDays+' days',money(v.laterAmount)):''}${change!==null?outlookRow('Change to saved outlook',money(change,{sign:true}),'outlook-change'):''}`;
+}
+function adjustmentEditor(d){
+  const m=monthStats(),recent=DATA.adjustmentRecent;
+  return `<section class="sec outlook-editor"><div class="outlook-context">${outlookRow('Recorded this month',money(m.everyday))}${outlookRow('Monthly target',m.budget?money(m.budget):'Not set')}${d.priorOutlook!=null?outlookRow('Saved outlook',money(d.priorOutlook)):''}</div><p class="note">${m.daysLeft} ${m.daysLeft===1?'day':'days'} left, including today. Amounts already recorded today are not added again.</p><label class="fld"><span>Additional daily reference (${esc(cur())})</span><input class="in" id="adj-daily" inputmode="decimal" value="${esc(d.daily)}" placeholder="Choose an amount"></label>${Object.keys(recent?.everydayDays||{}).length>=4?`<p class="note">Last 7 completed days: ${money(Math.round(budgetSpent(recent)/7))} per day in recorded payments.</p>`:''}<div id="adj-preview" class="outlook-preview" aria-live="polite">${adjustmentPreview(d,m)}</div><p class="note">One outlook until ${esc(shortDate(m.last))}. Weekly reviews do not add money. This is a planning reference, not an assessment of available cash.</p>${d.error?`<p class="err" role="alert">${esc(d.error)}</p>`:''}<div class="acts"><button type="button" class="link" data-act="adj-cancel">Cancel</button><button type="button" class="btn push" data-act="adj-save" ${categoryBusy?'disabled':''}>${d.id?'Save revision':'Save outlook'}</button></div></section>`;
+}
+function outlookReviewHTML(a){
+  const check=a.checkin,remaining=a.left>=0?money(a.left):money(-a.left);
+  return `<section class="sec outlook-detail"><div class="outlook-result"><span>${a.complete?'Final recorded everyday spending':'Month-end outlook'}</span><strong>${money(a.complete?a.spent:a.outlook)}</strong><small>${esc(cycleLabel(a.cycleFrom,a.to))}</small></div>${outlookRow('Original monthly target',a.originalTarget?money(a.originalTarget):'Not set')}${outlookRow(a.complete?'Saved outlook':'Recorded so far',money(a.complete?a.outlook:a.spent))}${outlookRow(a.left<0?'Above outlook':a.complete?'Below outlook':'Remaining in outlook',remaining)}${a.revisions?outlookRow('Initial outlook',money(a.initialOutlook)):''}${!a.complete?`<div class="outlook-reference"><span>${a.left>0?'Remaining daily reference':a.left===0?'At your outlook':'Outlook exceeded'}</span><strong>${a.left>0?money(a.dailyRemaining):a.left===0?money(0):'Review ahead'}</strong><small>${a.daysLeft} days including today. Not a daily cap.</small></div>`:''}</section>${check?`<section class="sec outlook-check"><h3><span>Weekly check-in</span><span>${esc(shortDate(check.from)+' – '+shortDate(check.to))}</span></h3>${outlookRow('Recorded everyday spending',money(check.spent))}${outlookRow('Average per calendar day',money(Math.round(check.spent/check.days)))}${check.previous!==null?outlookRow('Previous '+check.days+' days',money(check.previous))+'<p class="note">'+esc(check.spent===check.previous?'Recorded amounts are unchanged.':money(Math.abs(check.spent-check.previous))+(check.spent<check.previous?' less':' more')+' recorded than the preceding equal period.')+'</p>':'<p class="note">Not enough comparable recording days to establish a change.</p>'}<p class="note">Includes recorded Octopus funding, not actual daily card usage. This review does not reset the outlook.</p></section>`:''}`;
 }
 function adjustmentPageHTML(){
   if(loading)return '<p class="note">Loading your spending…</p>';
-  const m=monthStats(),a=DATA.spendingAdjustment,p=latestAdjustment(),current=a&&p&&a.id===p.id?a:null;
+  const m=monthStats(),a=DATA.spendingAdjustment,p=currentAdjustment(),current=a&&p&&a.id===p.id?a:null;
   if(adjustmentDraft)return adjustmentEditor(adjustmentDraft);
-  const active=current&&!current.complete,canStart=!active&&(!current||current.to<today());
-  return `<section class="sec"><p class="note">A short-term reference for everyday spending. Your financial month and every recorded expense stay unchanged.</p>${budgetTargetHTML(m,true)}</section>${current?`<section class="sec adjustment-panel">${adjustmentProgressHTML(current)}${active?`<div class="acts"><button type="button" class="link" data-act="adj-stop">Stop tracking</button><button type="button" class="link ink push" data-act="adj-edit">Edit reference</button></div>`:''}</section>`:''}${canStart?`<section class="sec"><button type="button" class="btn" data-act="adj-new">${current?'Set another reference':'Set a reference'}</button><p class="note">Up to seven days, ending no later than the current financial month.</p></section>`:''}`
+  if(current?.kind==='month')return outlookReviewHTML(current)+`<section class="sec"><div class="acts"><button type="button" class="link" data-act="adj-stop">Stop tracking</button><button type="button" class="btn push" data-act="adj-edit">Revise outlook</button></div><p class="note">Revising changes only the outlook, not your original monthly target or recorded expenses.</p></section>`;
+  return `<section class="sec outlook-intro"><p class="note">Choose an everyday spending reference for all ${m.daysLeft} remaining days of this financial month. Keep your monthly target unchanged and review progress weekly.</p>${outlookRow('Recorded this month',money(m.everyday))}${outlookRow('Monthly target',m.budget?money(m.budget):'Not set')}${m.budget&&m.left<0?outlookRow('Above target',money(-m.left)):''}${current?.kind==='week'?`<div class="outlook-legacy"><strong>Previous spending reference</strong><p class="note">${esc(cycleLabel(current.from,current.to))} · ${money(current.spent)} recorded / ${money(current.target)} reference. Your existing reference is preserved. Confirm a new outlook to extend planning to month end.</p></div>`:''}<button type="button" class="btn" data-act="adj-new">${current?.kind==='week'?'Plan to month end':'Set outlook'}</button>${current?.kind==='week'&&!current.complete?'<button type="button" class="link" data-act="adj-stop">Stop previous reference</button>':''}</section>${!current&&a?.kind==='month'&&a.complete?'<section class="sec"><h3><span>Previous month review</span></h3></section>'+outlookReviewHTML(a):''}`;
 }
 function startAdjustment(edit=false){
   if(categoryBusy||loading||view!=='prefs'||prefsPage!=='adjustment')return;
-  const p=latestAdjustment(),ref=today(),m=cycleBounds(ref);
-  if(edit){if(!p||p.to<ref)return;adjustmentDraft={id:p.id,from:p.from,to:p.to,daily:plain(p.daily),error:''}}
-  else{if(p&&p.to>=ref)return;adjustmentDraft={id:null,from:ref,to:[addDays(ref,6),m.last].sort()[0],daily:'',error:''}}
-  render();
+  const p=currentAdjustment(),m=monthStats(),a=adjustmentVisible(m),ref=today();
+  if(edit&&(!p||p.kind!=='month'||!a))return;
+  if(!edit&&p?.kind==='month')return;
+  const daily=edit?(a.dailyRemaining>0?plain(a.dailyRemaining):''):p?.kind==='week'?plain(p.daily):'';
+  adjustmentDraft={id:edit?p.id:null,legacyId:!edit&&p?.kind==='week'?p.id:null,cycleFrom:m.first,to:m.last,asOf:ref,baseline:m.everyday,priorOutlook:edit?p.outlook:null,daily,error:''};render();
 }
 async function saveAdjustment(stop=false){
   if(categoryBusy||loading||view!=='prefs'||prefsPage!=='adjustment')return;
-  const d=adjustmentDraft,p=latestAdjustment(),ref=today();
-  if(stop){if(!p||p.to<ref||!confirm('Stop tracking this reference? Your expenses and monthly target will stay unchanged.'))return}
+  const d=adjustmentDraft,p=currentAdjustment(),ref=today(),m=monthStats();
+  if(stop){if(!p||!confirm('Stop tracking this outlook? Your expenses and monthly target stay unchanged.'))return}
   else if(!d)return;
-  const daily=stop?p.daily:parseMoney(d.daily);
-  if(!stop&&(daily===null||!Number.isSafeInteger(daily*7)||d.to<ref||(!d.id&&d.from!==ref)||(!d.id&&p&&p.to>=ref)||d.id&&p?.id!==d.id)){
-    d.error='Enter a positive reference amount. If the date changed, cancel and start again.';render();return
+  const v=stop?null:outlookPreview(m.everyday,parseMoney(d.daily),m.daysLeft);
+  if(!stop&&(!v||d.asOf!==ref||d.cycleFrom!==m.first||d.to!==m.last||d.id&&p?.id!==d.id||!d.id&&p?.kind==='month')){
+    d.error='Enter a positive amount. If the financial period changed, cancel and start again.';render();return
   }
-  const item=stop?{...p,stopped:true}:{id:d.id||uid(),from:d.from,to:d.to,daily,stopped:false};
-  const next=(S.spendingAdjustments||[]).filter(x=>x.id!==item.id).concat(item);
-  if(!validAdjustments(next)){toast('Could not save the reference.');return}
+  if(!stop&&d.baseline!==m.everyday){d.baseline=m.everyday;d.error='Recorded spending changed. Review the updated outlook before saving.';render();return}
   if(eraseBlocked()){toast('Finish active operations before saving.');return}
   categoryBusy=true;render();const previous=S.spendingAdjustments;
-  try{await saveQueue.catch(()=>{});if(eraseBlocked())throw Error('Another operation is running.');S.spendingAdjustments=next;try{await persist()}catch(e){S.spendingAdjustments=previous;throw e}adjustmentDraft=null;await refreshView();toast(stop?'Reference stopped. Your records are unchanged.':'Spending reference saved.')}
-  catch(e){if(d)d.error=e.message;toast('Could not save: '+e.message)}finally{categoryBusy=false;render()}
+  try{
+    await saveQueue.catch(()=>{});if(eraseBlocked())throw Error('Another operation is running.');
+    if(!stop){
+      const fresh=await dbSummary(m.first,ref);
+      if(budgetSpent(fresh)!==d.baseline){DATA.month=fresh;d.baseline=budgetSpent(fresh);throw Error('Recorded spending changed. Review the updated outlook before saving.')}
+      if(today()!==ref||cycleBounds().first!==m.first||cycleBounds().last!==m.last)throw Error('The financial period changed. Cancel and start again.');
+    }
+    const item=stop?{...p,stopped:true}:d.id?{...p,outlook:v.outlook,revisions:p.revisions+(p.outlook!==v.outlook?1:0)}:{kind:'month',id:uid(),from:ref,to:m.last,cycleFrom:m.first,outlook:v.outlook,initialOutlook:v.outlook,originalTarget:m.budget,revisions:0,stopped:false};
+    const next=previous.filter(x=>x.id!==item.id).map(x=>!stop&&!d.id&&!x.stopped&&x.from<=item.to&&item.from<=x.to?{...x,stopped:true}:x).concat(item);
+    if(!validAdjustments(next))throw Error('Invalid outlook.');
+    S.spendingAdjustments=next;try{await persist()}catch(e){S.spendingAdjustments=previous;throw e}
+    adjustmentDraft=null;await refreshView();toast(stop?'Tracking stopped. Your records are unchanged.':'Month-end outlook saved.');
+  }catch(e){if(d)d.error=e.message;toast('Could not save: '+e.message)}finally{categoryBusy=false;render()}
 }
 
 const ACT={
